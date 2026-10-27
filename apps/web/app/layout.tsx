@@ -1,23 +1,21 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google';
+import { Sidebar } from '@/components/sidebar';
 import './globals.css';
+
+const display = Bricolage_Grotesque({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-bricolage' });
+const body = Instrument_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-instrument' });
 
 export const metadata: Metadata = { title: 'life-os', description: 'Mis obligaciones y el brief del día' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${display.variable} ${body.variable}`}>
       <body>
-        <header className="top">
-          <strong>life-os</strong>
-          <nav>
-            <Link href="/brief">Brief</Link>
-            <Link href="/review">Revisar</Link>
-            <Link href="/obligations">Obligaciones</Link>
-            <Link href="/documents">Documentos</Link>
-          </nav>
-        </header>
-        <main>{children}</main>
+        <div className="shell">
+          <Sidebar />
+          <main className="page">{children}</main>
+        </div>
       </body>
     </html>
   );

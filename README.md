@@ -57,6 +57,7 @@ ollama pull qwen2.5:7b-instruct
 cp .env.example .env          # ajustar WATCH_DIR a la carpeta de papeles
 npm install && npm run web:install
 npm run db:up && npm run db:migrate
+npm run dev                   # worker + API + web juntos (o por separado:)
 npm run worker                # terminal 1: carpeta observada + extracción
 npm run api                   # terminal 2: http://127.0.0.1:3010/api
 npm run web                   # terminal 3: http://localhost:3011

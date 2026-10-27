@@ -1,41 +1,55 @@
 'use client';
 
-import { useCallback } from 'react';
-import { api } from '@/lib/api';
+import { useCallback, useState } from 'react';
+import { api, type DocumentSummary } from '@/lib/api';
 import { useLoad } from '@/lib/use-load';
 
-const STATUS_LABELS = {
-  PENDING: 'en cola',
-  TEXT_EXTRACTED: 'leyendo con IA',
-  PROCESSED: 'procesado',
-  FAILED: 'falló',
-} as const;
+const STATUS: Record<DocumentSummary['status'], { label: string; tone: string }> = {
+  PENDING: { label: 'En cola', tone: 'working' },
+  TEXT_EXTRACTED: { label: 'Leyendo', tone: 'working' },
+  PROCESSED: { label: 'Leído', tone: '' },
+  FAILED: { label: 'No se pudo leer', tone: 'failed' },
+};
+
+const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
 export default function DocumentsPage() {
   const { data, error, reload } = useLoad(useCallback(() => api.documents(), []));
+  const [actionError, setActionError] = useState<string | null>(null);
+  const reprocess = (id: string) =>
+    api
+      .reprocess(id)
+      .then(() => setActionError(null))
+      .then(reload)
+      .catch((e: Error) => setActionError(`No se pudo volver a leer: ${e.message}`));
 
   return (
     <>
-      <h1>Documentos</h1>
-      <p className="muted">Lo que entró por la carpeta observada.</p>
-      {error && <p className="error">{error}</p>}
-      {data?.length === 0 && <p>Todavía no hay documentos. Dejá un PDF en la carpeta.</p>}
+      <header className="page-head">
+        <h1>Documentos</h1>
+        <p>Los archivos que entraron por la carpeta observada y qué pasó con cada uno.</p>
+      </header>
+      {error && <p className="notice error">No se pudo cargar la lista ({error}).</p>}
+      {actionError && <p className="notice error">{actionError}</p>}
+      {data?.length === 0 && (
+        <p className="empty">Todavía no entró ningún documento. Copiá un PDF con texto a la carpeta observada y va a aparecer acá.</p>
+      )}
       {data?.map((d) => (
-        <div key={d.id} className="card">
-          <div className="row">
-            <div>
-              <a className="path" href={api.fileUrl(d.id)} target="_blank" rel="noreferrer">
-                {d.path}
-              </a>
-              <div className="meta">
-                {new Date(d.createdAt).toLocaleString('es-AR')} · {d.textLength} caracteres de texto
-              </div>
-              {d.error && <p className="error">{d.error}</p>}
+        <div key={d.id} className="doc">
+          <div>
+            <a className="name" href={api.fileUrl(d.id)} target="_blank" rel="noreferrer" title={d.path}>
+              {fileName(d.path)}
+            </a>
+            <div className="detail">
+              Entró el {new Date(d.createdAt).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' })}
             </div>
-            <div className="actions">
-              <span className={`badge ${d.status === 'FAILED' ? 'failed' : ''}`}>{STATUS_LABELS[d.status]}</span>
-              <button onClick={() => api.reprocess(d.id).then(reload)}>Reprocesar</button>
-            </div>
+            {d.error && <div className="why">{d.error}</div>}
+          </div>
+          <div className="side">
+            <span className={`status ${STATUS[d.status].tone}`}>{STATUS[d.status].label}</span>
+            <button className="quiet" onClick={() => reprocess(d.id)}>
+              Volver a leer
+            </button>
           </div>
         </div>
       ))}

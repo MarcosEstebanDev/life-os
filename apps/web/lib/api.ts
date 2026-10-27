@@ -86,6 +86,26 @@ export function formatDate(d: string | null): string {
   return `${day}/${m}/${y}`;
 }
 
+/** "hoy", "mañana", "en 5 días", "hace 3 días". Fechas sin hora, comparadas en UTC. */
+export function relativeDay(date: string, today: string): string {
+  const days = Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  if (days === 0) return 'vence hoy';
+  if (days === 1) return 'vence mañana';
+  if (days === -1) return 'venció ayer';
+  return days > 0 ? `en ${days} días` : `hace ${-days} días`;
+}
+
+/** Hoy en la zona local, igual que el reloj de la API. */
+export function localToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+
+export function longDate(date: string): string {
+  return new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+    new Date(`${date}T00:00:00Z`),
+  );
+}
+
 export function formatAmount(o: Pick<Obligation, 'amount' | 'currency'>): string {
   if (!o.amount) return '';
   const n = Number(o.amount).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
