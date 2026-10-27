@@ -11,7 +11,7 @@ const extractor = new FakeTextExtractor('texto');
 test('un archivo nuevo crea el documento PENDING y encola la extracción de texto', async () => {
   const docs = new InMemoryDocuments();
   const queue = new RecordingQueue();
-  const result = await new IngestFileUseCase(docs, queue, extractor).execute({ path: 'C:/p/a.pdf', sha256: 'h1', sizeBytes: 5 });
+  const result = await new IngestFileUseCase(docs, queue, extractor).execute({ path: 'C:/p/a.pdf', sha256: 'h1', sizeBytes: 5, ownerId: 'u1' });
   assert.equal(result.status, 'created');
   const doc = await docs.get(result.documentId!);
   assert.equal(doc.status, 'PENDING');
@@ -23,22 +23,22 @@ test('el mismo contenido con otro nombre no se reprocesa', async () => {
   const docs = new InMemoryDocuments();
   const queue = new RecordingQueue();
   const ingest = new IngestFileUseCase(docs, queue, extractor);
-  await ingest.execute({ path: 'C:/p/a.pdf', sha256: 'h1', sizeBytes: 5 });
-  const again = await ingest.execute({ path: 'C:/p/copia de a.pdf', sha256: 'h1', sizeBytes: 5 });
+  await ingest.execute({ path: 'C:/p/a.pdf', sha256: 'h1', sizeBytes: 5, ownerId: 'u1' });
+  const again = await ingest.execute({ path: 'C:/p/copia de a.pdf', sha256: 'h1', sizeBytes: 5, ownerId: 'u1' });
   assert.equal(again.status, 'duplicate');
   assert.equal(queue.jobs.length, 1);
-  assert.equal((await docs.list()).length, 1);
+  assert.equal((await docs.list('u1')).length, 1);
 });
 
 test('una extensión no soportada se ignora', async () => {
   const docs = new InMemoryDocuments();
-  const result = await new IngestFileUseCase(docs, new RecordingQueue(), extractor).execute({ path: 'C:/p/a.DOCX', sha256: 'h', sizeBytes: 1 });
+  const result = await new IngestFileUseCase(docs, new RecordingQueue(), extractor).execute({ path: 'C:/p/a.DOCX', sha256: 'h', sizeBytes: 1, ownerId: 'u1' });
   assert.equal(result.status, 'unsupported');
-  assert.equal((await docs.list()).length, 0);
+  assert.equal((await docs.list('u1')).length, 0);
 });
 
 async function pendingDoc(docs: InMemoryDocuments) {
-  return docs.create({ path: 'C:/p/a.pdf', sha256: 'h', mimeType: 'application/pdf', sizeBytes: 1, status: 'PENDING', error: null, text: null });
+  return docs.create({ ownerId: 'u1', path: 'C:/p/a.pdf', sha256: 'h', mimeType: 'application/pdf', sizeBytes: 1, status: 'PENDING', error: null, text: null });
 }
 
 test('un PDF sin texto queda FAILED pidiendo OCR', async () => {
@@ -79,13 +79,13 @@ test('reprocesar borra sólo las propuestas del documento y vuelve a empezar', a
   const doc = await pendingDoc(docs);
   const base: Obligation = {
     id: 'p', title: 't', kind: 'OTHER', dueDate: null, recurrence: 'NONE', amount: null, currency: null, counterparty: null,
-    sourceDocumentId: doc.id, evidence: [], confidence: 1, status: 'PROPOSED', seriesKey: 'k', possibleUpdateOf: null, doneAt: null,
+    sourceDocumentId: doc.id, evidence: [], confidence: 1, status: 'PROPOSED', seriesKey: 'k', possibleUpdateOf: null, ownerId: 'u1', doneAt: null,
   };
   await obligations.insert(base);
   await obligations.insert({ ...base, id: 'a', status: 'ACTIVE', dueDate: '2027-01-01' });
   await docs.update(doc.id, { status: 'FAILED', error: 'x' });
 
-  await new ReprocessDocumentUseCase(docs, obligations, queue).execute(doc.id);
+  await new ReprocessDocumentUseCase(docs, obligations, queue).execute('u1', doc.id);
 
   assert.deepEqual([...obligations.items.keys()], ['a']);
   const d = await docs.get(doc.id);

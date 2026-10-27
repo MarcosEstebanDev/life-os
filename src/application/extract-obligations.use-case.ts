@@ -107,7 +107,7 @@ export class ExtractObligationsUseCase {
       const dueDate = absoluteUnbacked ? null : resolveDueDate(item.due, documentDate);
       const rawAmount = item.amount === null ? null : item.amount.toFixed(2);
       const amount = rawAmount && amountAppears(rawAmount, text) ? rawAmount : null;
-      const decision = decideDuplicate({ seriesKey: key, dueDate, amount }, await this.obligations.findBySeries(key));
+      const decision = decideDuplicate({ seriesKey: key, dueDate, amount }, await this.obligations.findBySeries(doc.ownerId, key));
 
       if (decision.action === 'attach') {
         const existing = await this.obligations.get(decision.to);
@@ -118,6 +118,7 @@ export class ExtractObligationsUseCase {
       }
       const proposal: Obligation = {
         id: this.newId(),
+        ownerId: doc.ownerId,
         title: item.title,
         kind: item.kind,
         dueDate,

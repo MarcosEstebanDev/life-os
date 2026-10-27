@@ -9,7 +9,7 @@ function existing(overrides: Partial<Obligation>): Obligation {
   return {
     id: 'x', title: 'Pagar tarjeta', kind: 'PAYMENT', dueDate: '2026-11-30', recurrence: 'MONTHLY',
     amount: '1000.00', currency: 'ARS', counterparty: 'Banco', sourceDocumentId: 'd0', evidence: [],
-    confidence: 1, status: 'ACTIVE', seriesKey: KEY, possibleUpdateOf: null, doneAt: null, ...overrides,
+    confidence: 1, status: 'ACTIVE', seriesKey: KEY, possibleUpdateOf: null, ownerId: 'u1', doneAt: null, ...overrides,
   };
 }
 

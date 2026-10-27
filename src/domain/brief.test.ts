@@ -6,7 +6,7 @@ import type { Obligation } from './obligation.js';
 function o(id: string, dueDate: string | null, status: Obligation['status'] = 'ACTIVE'): Obligation {
   return {
     id, title: id, kind: 'PAYMENT', dueDate, recurrence: 'NONE', amount: null, currency: null, counterparty: null,
-    sourceDocumentId: 'd', evidence: [], confidence: 1, status, seriesKey: id, possibleUpdateOf: null, doneAt: null,
+    sourceDocumentId: 'd', evidence: [], confidence: 1, status, seriesKey: id, possibleUpdateOf: null, ownerId: 'u1', doneAt: null,
   };
 }
 
