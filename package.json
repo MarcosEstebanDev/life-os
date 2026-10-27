@@ -14,7 +14,10 @@
     "db:migrate": "prisma migrate dev && prisma generate",
     "db:smoke": "tsx --env-file=.env src/db-smoke.ts",
     "worker": "tsx --env-file=.env src/worker/main.ts",
-    "api": "tsx --env-file=.env src/api/main.ts"
+    "api": "tsx --env-file=.env src/api/main.ts",
+    "web": "npm --prefix apps/web run dev",
+    "web:install": "npm --prefix apps/web install",
+    "web:build": "npm --prefix apps/web run build"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
