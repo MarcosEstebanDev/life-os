@@ -25,7 +25,23 @@ export class OpenAiCompatibleAdapter implements LlmPort {
   }
 
   async completeJson(input: { system: string; user: string }): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+    const res = await this.post(input);
+    if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const body = (await res.json()) as { choices?: Array<{ message?: { content?: string | null } }> };
+    return body.choices?.[0]?.message?.content ?? '';
+  }
+
+  /** "fetch failed" no le dice nada a nadie: se nombra a dónde se intentó ir. */
+  private async post(input: { system: string; user: string }): Promise<Response> {
+    try {
+      return await this.request(input);
+    } catch (e) {
+      throw new Error(`no se pudo conectar al LLM en ${this.baseUrl} (¿está corriendo Ollama?): ${(e as Error).message}`);
+    }
+  }
+
+  private request(input: { system: string; user: string }): Promise<Response> {
+    return fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${this.config.apiKey}` },
       body: JSON.stringify({
@@ -39,8 +55,5 @@ export class OpenAiCompatibleAdapter implements LlmPort {
       }),
       signal: AbortSignal.timeout(this.config.timeoutMs ?? 300_000),
     });
-    if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 300)}`);
-    const body = (await res.json()) as { choices?: Array<{ message?: { content?: string | null } }> };
-    return body.choices?.[0]?.message?.content ?? '';
   }
 }

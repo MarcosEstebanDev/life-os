@@ -12,7 +12,8 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:migrate": "prisma migrate dev && prisma generate",
-    "db:smoke": "tsx --env-file=.env src/db-smoke.ts"
+    "db:smoke": "tsx --env-file=.env src/db-smoke.ts",
+    "worker": "tsx --env-file=.env src/worker/main.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
@@ -24,6 +25,9 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "bullmq": "^6.5.0",
+    "chokidar": "^4.0.3",
+    "ioredis": "^6.0.0",
     "pdf-parse": "^2.4.5",
     "zod": "^3.25.0"
   }
