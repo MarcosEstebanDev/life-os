@@ -7,14 +7,23 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
-    "llm:smoke": "tsx --env-file-if-exists=.env src/llm-smoke.ts"
+    "llm:smoke": "tsx --env-file-if-exists=.env src/llm-smoke.ts",
+    "postinstall": "prisma generate",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate dev && prisma generate",
+    "db:smoke": "tsx --env-file=.env src/db-smoke.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "dotenv": "^17.4.2",
+    "prisma": "^7.10.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
     "pdf-parse": "^2.4.5",
     "zod": "^3.25.0"
   }
