@@ -1,0 +1,19 @@
+{
+  "name": "life-os",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Second Brain + Life Dashboard: obligaciones extraídas de mis papeles y un brief diario",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  }
+}
