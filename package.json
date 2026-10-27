@@ -6,7 +6,8 @@
   "description": "Second Brain + Life Dashboard: obligaciones extraídas de mis papeles y un brief diario",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "llm:smoke": "tsx --env-file-if-exists=.env src/llm-smoke.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
@@ -14,6 +15,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "pdf-parse": "^2.4.5",
     "zod": "^3.25.0"
   }
 }
