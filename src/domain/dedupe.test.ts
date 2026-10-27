@@ -58,6 +58,14 @@ test('sin fecha y con una activa de la misma serie es posible actualización', (
   assert.deepEqual(d, { action: 'possibleUpdate', of: 'a' });
 });
 
+test('sin fecha y con una propuesta sin fecha de la misma serie se adjunta a esa', () => {
+  const d = decideDuplicate({ seriesKey: KEY, dueDate: null, amount: null }, [
+    existing({ id: 'p', status: 'PROPOSED', dueDate: null }),
+    existing({ id: 'a' }),
+  ]);
+  assert.deepEqual(d, { action: 'attach', to: 'p' });
+});
+
 test('otra serie es nueva', () => {
   const d = decideDuplicate({ seriesKey: 'otra', dueDate: '2026-11-30', amount: null }, [existing({ id: 'a' })]);
   assert.deepEqual(d, { action: 'new' });

@@ -115,7 +115,7 @@ test('una fecha de documento sin evidencia no se usa', async () => {
 });
 
 test('la misma obligación en dos trozos queda una sola, con las dos evidencias', async () => {
-  const long = `${TEXT}\n${'relleno '.repeat(2_000)}\nRecordatorio: Total a pagar $ 1.234,56 hasta el 15/11/2026.`;
+  const long = `${TEXT}\n${'relleno '.repeat(1_000)}\nRecordatorio: Total a pagar $ 1.234,56 hasta el 15/11/2026.`;
   const second = payment({ evidence: 'Total a pagar $ 1.234,56 hasta el 15/11/2026' });
   const { useCase, obligations, doc } = await setup([answer([payment()]), answer([second])], long);
   const result = await useCase.execute(doc.id);
@@ -131,8 +131,53 @@ test('si ya existe la activa de la misma serie se le suma evidencia', async () =
   assert.deepEqual((await obligations.get('vieja')).evidence, ['antes', 'Vence el 15/11/2026']);
 });
 
+test('un monto que no aparece en el texto no se guarda: lo completo al revisar', async () => {
+  const { useCase, obligations, doc } = await setup([answer([payment({ amount: 1.234 })])]);
+  await useCase.execute(doc.id);
+  assert.equal((await obligations.list())[0].amount, null);
+});
+
+test('una fecha absoluta que no aparece en el texto (o leída mm/dd) no se guarda', async () => {
+  const { useCase, obligations, doc } = await setup([answer([payment({ due: { type: 'absolute', date: '2026-12-20' } })])]);
+  await useCase.execute(doc.id);
+  assert.equal((await obligations.list())[0].dueDate, null);
+});
+
+test('una fecha de documento que no aparece en el texto no se usa para plazos relativos', async () => {
+  const { useCase, obligations, doc } = await setup([answer([visa()], { date: '2026-10-12', evidence: 'Fecha de emisión: 21/10/2026' })]);
+  await useCase.execute(doc.id);
+  assert.equal((await obligations.list())[0].dueDate, null);
+});
+
+test('si un trozo falla dos veces, se usan los demás y el documento avisa', async () => {
+  const long = `${TEXT}\n${'relleno '.repeat(1_000)}`;
+  const { useCase, obligations, docs, doc } = await setup([answer([payment()]), 'roto', 'roto'], long);
+  await useCase.execute(doc.id);
+  assert.equal((await obligations.list()).length, 1);
+  const d = await docs.get(doc.id);
+  assert.equal(d.status, 'PROCESSED');
+  assert.match(d.error ?? '', /^trozos inválidos 1\/2/);
+});
+
+test('procesar dos veces el mismo documento no duplica propuestas ni evidencia', async () => {
+  const { useCase, obligations, doc } = await setup([answer([payment()]), answer([payment()])]);
+  await obligations.insert(activeCard({ id: 'otra', dueDate: '2027-06-01', seriesKey: 'x' }));
+  await useCase.execute(doc.id);
+  await useCase.execute(doc.id);
+  const proposed = await obligations.list({ status: 'PROPOSED' });
+  assert.equal(proposed.length, 1);
+  assert.deepEqual(proposed[0].evidence, ['Vence el 15/11/2026']);
+});
+
+test('adjuntar la misma evidencia dos veces no la repite', async () => {
+  const { useCase, obligations, doc } = await setup([answer([payment()])]);
+  await obligations.insert(activeCard({ evidence: ['Vence el 15/11/2026'] }));
+  await useCase.execute(doc.id);
+  assert.deepEqual((await obligations.get('vieja')).evidence, ['Vence el 15/11/2026']);
+});
+
 test('un monto distinto para la misma fecha queda como posible actualización', async () => {
-  const { useCase, obligations, doc } = await setup([answer([payment({ amount: 999 })])]);
+  const { useCase, obligations, doc } = await setup([answer([payment({ amount: 999 })])], `${TEXT}\nAjuste: total $ 999,00.`);
   await obligations.insert(activeCard({ dueDate: '2026-11-15' }));
   await useCase.execute(doc.id);
   const proposed = await obligations.list({ status: 'PROPOSED' });

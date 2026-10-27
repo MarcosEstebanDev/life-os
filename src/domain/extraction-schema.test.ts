@@ -33,6 +33,16 @@ test('rechaza fechas que no son ISO', () => {
   assert.equal(extractionResultSchema.safeParse(withObligation({ due: { type: 'absolute', date: '15/03/2027' } })).success, false);
 });
 
+test('rechaza fechas con formato ISO pero inexistentes', () => {
+  assert.equal(extractionResultSchema.safeParse(withObligation({ due: { type: 'absolute', date: '2027-02-30' } })).success, false);
+  assert.equal(extractionResultSchema.safeParse({ ...valid, documentDate: { date: '2026-13-45', evidence: 'x' } }).success, false);
+});
+
+test('rechaza montos negativos o absurdos (un CBU tomado como monto)', () => {
+  assert.equal(extractionResultSchema.safeParse(withObligation({ amount: -5 })).success, false);
+  assert.equal(extractionResultSchema.safeParse(withObligation({ amount: 2850590940090418135201 })).success, false);
+});
+
 test('rechaza confianza fuera de 0..1', () => {
   assert.equal(extractionResultSchema.safeParse(withObligation({ confidence: 1.5 })).success, false);
 });

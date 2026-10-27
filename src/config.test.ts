@@ -27,6 +27,11 @@ test('un host que sólo empieza con localhost no cuenta como local', () => {
   assert.throws(() => loadConfig({ ...base, LLM_BASE_URL: 'http://localhost.evil.com/v1' }), ConfigError);
 });
 
+test('un modelo cloud de Ollama cuenta como remoto aunque la URL sea local', () => {
+  assert.throws(() => loadConfig({ ...base, LLM_MODEL: 'gpt-oss:120b-cloud' }), (e: unknown) => e instanceof ConfigError && /LLM_ALLOW_REMOTE/.test(e.message));
+  assert.equal(loadConfig({ ...base, LLM_MODEL: 'gpt-oss:120b-cloud', LLM_ALLOW_REMOTE: 'true' }).llm.allowRemote, true);
+});
+
 test('falta una variable obligatoria', () => {
   assert.throws(() => loadConfig({ ...base, WATCH_DIR: undefined }), (e: unknown) => e instanceof ConfigError && /WATCH_DIR/.test(e.message));
 });

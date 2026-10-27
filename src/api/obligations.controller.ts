@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Param, Po
 import { z } from 'zod';
 import type { CompleteObligationUseCase } from '../application/complete-obligation.use-case.js';
 import type { ReviewObligationUseCase } from '../application/review-obligation.use-case.js';
+import { isoDate } from '../domain/extraction-schema.js';
 import type { ObligationStatus } from '../domain/obligation.js';
 import type { ObligationRepository } from '../domain/ports/obligation-repository.port.js';
 import { COMPLETE, OBLIGATIONS, REVIEW } from './tokens.js';
@@ -13,9 +14,9 @@ const editsSchema = z
   .object({
     title: z.string().min(1),
     kind: z.enum(['PAYMENT', 'RENEWAL', 'DEADLINE', 'EXPIRY', 'OTHER']),
-    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    dueDate: isoDate.nullable(),
     recurrence: z.enum(['NONE', 'MONTHLY', 'YEARLY']),
-    amount: z.string().regex(/^\d+(\.\d{1,2})?$/).nullable(),
+    amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/).nullable(),
     currency: z.string().regex(/^[A-Z]{3}$/).nullable(),
     counterparty: z.string().nullable(),
   })

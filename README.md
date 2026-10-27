@@ -31,12 +31,18 @@ carpeta observada ─▶ texto (pdf-parse) ─▶ LLM local propone obligaciones
 - **El brief se calcula en vivo**: no depende de un cron ni de que la PC esté
   prendida a una hora.
 
+- **Montos y fechas tienen que estar escritos en el texto.** Si el modelo lee
+  `1.234` donde dice `$ 1.234,56`, o da vuelta día y mes, el dato queda vacío
+  y lo completo al revisar.
+
 ## Privacidad
 
 Son datos financieros. El LLM corre **local con Ollama** por defecto. Si
-`LLM_BASE_URL` apunta fuera de esta máquina, el sistema **no arranca** salvo
-que `LLM_ALLOW_REMOTE=true` esté puesto a propósito. La API escucha sólo en
-`127.0.0.1` y no tiene autenticación.
+`LLM_BASE_URL` apunta fuera de esta máquina, o `LLM_MODEL` es un modelo
+`-cloud` de Ollama (corre en ollama.com aunque se pida al endpoint local), el
+sistema **no arranca** salvo que `LLM_ALLOW_REMOTE=true` esté puesto a
+propósito. La API escucha sólo en `127.0.0.1`, no tiene autenticación y
+rechaza pedidos cuyo `Host` no sea `localhost`/`127.0.0.1` (DNS rebinding).
 
 ## Levantarlo
 

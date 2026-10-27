@@ -1,7 +1,7 @@
 import { chunkText } from '../domain/chunk-text.js';
 import type { IsoDate } from '../domain/dates.js';
 import { decideDuplicate } from '../domain/dedupe.js';
-import { evidenceAppears } from '../domain/evidence.js';
+import { amountAppears, dateAppears, evidenceAppears } from '../domain/evidence.js';
 import { extractionResultSchema, type ExtractionResult } from '../domain/extraction-schema.js';
 import type { Obligation } from '../domain/obligation.js';
 import type { Clock } from '../domain/ports/clock.port.js';
@@ -71,19 +71,30 @@ export class ExtractObligationsUseCase {
     const counts = { proposed: 0, attached: 0, discarded: 0 };
     const doc = await this.documents.get(documentId);
     const text = doc.text ?? '';
+    // Idempotente: un reintento de la cola no suma propuestas sobre las de la corrida anterior.
+    await this.obligations.deleteProposedByDocument(documentId);
 
-    let results: ExtractionResult[];
-    try {
-      results = [];
-      for (const chunk of chunkText(text)) results.push(await this.ask(chunk));
-    } catch (e) {
-      if (!(e instanceof InvalidLlmResponse)) throw e;
-      await this.documents.update(documentId, { status: 'FAILED', error: e.message });
+    // Con temperatura 0 reprocesar repite el mismo fallo: un trozo roto no tira el resto.
+    const chunks = chunkText(text);
+    const results: ExtractionResult[] = [];
+    const failures: string[] = [];
+    for (const chunk of chunks) {
+      try {
+        results.push(await this.ask(chunk));
+      } catch (e) {
+        if (!(e instanceof InvalidLlmResponse)) throw e;
+        failures.push(e.message);
+      }
+    }
+    if (results.length === 0) {
+      await this.documents.update(documentId, { status: 'FAILED', error: failures[0] });
       return counts;
     }
 
     const documentDate =
-      results.map((r) => r.documentDate).find((d) => d && evidenceAppears(d.evidence, text))?.date ?? null;
+      results
+        .map((r) => r.documentDate)
+        .find((d) => d && evidenceAppears(d.evidence, text) && dateAppears(d.date, text))?.date ?? null;
 
     for (const item of results.flatMap((r) => r.obligations)) {
       if (!evidenceAppears(item.evidence, text)) {
@@ -91,13 +102,17 @@ export class ExtractObligationsUseCase {
         continue;
       }
       const key = seriesKey(item);
-      const dueDate = resolveDueDate(item.due, documentDate);
-      const amount = item.amount === null ? null : item.amount.toFixed(2);
+      // Fecha o monto que no están escritos en el texto quedan vacíos: los completo al revisar.
+      const absoluteUnbacked = item.due.type === 'absolute' && !dateAppears(item.due.date, text);
+      const dueDate = absoluteUnbacked ? null : resolveDueDate(item.due, documentDate);
+      const rawAmount = item.amount === null ? null : item.amount.toFixed(2);
+      const amount = rawAmount && amountAppears(rawAmount, text) ? rawAmount : null;
       const decision = decideDuplicate({ seriesKey: key, dueDate, amount }, await this.obligations.findBySeries(key));
 
       if (decision.action === 'attach') {
         const existing = await this.obligations.get(decision.to);
-        await this.obligations.update({ ...existing, evidence: [...existing.evidence, item.evidence] });
+        const evidence = [...new Set([...existing.evidence, item.evidence])];
+        await this.obligations.update({ ...existing, evidence });
         counts.attached++;
         continue;
       }
@@ -122,7 +137,8 @@ export class ExtractObligationsUseCase {
       counts.proposed++;
     }
 
-    await this.documents.update(documentId, { status: 'PROCESSED', error: null });
+    const error = failures.length > 0 ? `trozos inválidos ${failures.length}/${chunks.length}: ${failures[0]}` : null;
+    await this.documents.update(documentId, { status: 'PROCESSED', error });
     return counts;
   }
 

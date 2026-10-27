@@ -72,6 +72,15 @@ test('completar una mensual guarda la hecha e inserta la siguiente', async () =>
   assert.equal(next.status, 'ACTIVE');
 });
 
+test('completar no duplica la siguiente si ya la acepté desde el resumen del mes', async () => {
+  const repo = await repoWith(
+    proposal({ status: 'ACTIVE', dueDate: '2026-10-31' }),
+    proposal({ id: 'nov', status: 'ACTIVE', dueDate: '2026-11-30' }),
+  );
+  await new CompleteObligationUseCase(repo, new FixedClock(), sequentialIds('n')).execute('p');
+  assert.equal((await repo.list({ status: 'ACTIVE' })).length, 1);
+});
+
 test('el brief usa el día del reloj', async () => {
   const repo = await repoWith(proposal({ status: 'ACTIVE', dueDate: '2026-10-26' }));
   const brief = await new GetBriefUseCase(repo, new FixedClock('2026-10-27')).execute();

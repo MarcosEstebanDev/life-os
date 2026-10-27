@@ -29,6 +29,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
         'Si querés mandar tus documentos ahí, poné LLM_ALLOW_REMOTE=true.',
     );
   }
+  const model = env.LLM_MODEL || 'qwen2.5:7b-instruct';
+  // Los modelos "-cloud" de Ollama se piden al endpoint local pero corren en ollama.com.
+  if (/[-:]cloud$/.test(model) && !allowRemote) {
+    throw new ConfigError(`LLM_MODEL=${model} corre fuera de esta máquina. Si es a propósito, poné LLM_ALLOW_REMOTE=true.`);
+  }
   return {
     databaseUrl: required(env, 'DATABASE_URL'),
     redisUrl: required(env, 'REDIS_URL'),
@@ -37,7 +42,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     llm: {
       baseUrl,
       apiKey: env.LLM_API_KEY || 'ollama',
-      model: env.LLM_MODEL || 'qwen2.5:7b-instruct',
+      model,
       allowRemote,
     },
   };

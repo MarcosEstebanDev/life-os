@@ -26,6 +26,8 @@ export function decideDuplicate(
     .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'));
 
   if (!candidate.dueDate) {
+    const undated = series.find((o) => o.status === 'PROPOSED' && !o.dueDate);
+    if (undated) return { action: 'attach', to: undated.id };
     return active[0] ? { action: 'possibleUpdate', of: active[0].id } : { action: 'new' };
   }
   const due = candidate.dueDate;
