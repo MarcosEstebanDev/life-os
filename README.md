@@ -41,8 +41,39 @@ Son datos financieros. El LLM corre **local con Ollama** por defecto. Si
 `LLM_BASE_URL` apunta fuera de esta máquina, o `LLM_MODEL` es un modelo
 `-cloud` de Ollama (corre en ollama.com aunque se pida al endpoint local), el
 sistema **no arranca** salvo que `LLM_ALLOW_REMOTE=true` esté puesto a
-propósito. La API escucha sólo en `127.0.0.1`, no tiene autenticación y
-rechaza pedidos cuyo `Host` no sea `localhost`/`127.0.0.1` (DNS rebinding).
+propósito. La API escucha sólo en `127.0.0.1` y rechaza pedidos cuyo `Host`
+no sea `localhost`/`127.0.0.1` (DNS rebinding).
+
+## Cuentas y seguridad
+
+Cada usuario ve sólo sus documentos y obligaciones: un id ajeno responde 404,
+igual que uno que no existe.
+
+- **Sesiones opacas en Postgres, no JWT** ([ADR 0001](docs/adr/0001-sesiones-opacas.md)):
+  cookie HttpOnly + SameSite=Lax con un token aleatorio; la base guarda sólo su
+  SHA-256. Cerrar una sesión, todas, o cambiar la contraseña tiene efecto en el acto.
+  En Seguridad se ven los dispositivos con su última actividad.
+- **Verificación en dos pasos (TOTP, RFC 6238)** implementada a mano y probada
+  con los vectores del RFC. Secreto cifrado con AES-256-GCM, 10 códigos de
+  recuperación de un solo uso (sólo su hash en la base), un código no sirve dos
+  veces. La contraseña sola deja una sesión que únicamente puede completar el login.
+- **Contraseñas con argon2id**, 12 a 128 caracteres, sin reglas de composición
+  (NIST SP 800-63B).
+- **Sin enumeración de cuentas:** email inexistente y contraseña incorrecta dan el
+  mismo mensaje, y los dos verifican un hash argon2.
+- **Límite de intentos en Redis:** 5 fallos por email y 20 por IP en 15 minutos →
+  429 con `Retry-After`. Cinco códigos de 2FA incorrectos cierran la sesión pendiente.
+- **CSRF:** SameSite=Lax y, además, todo método que modifica exige un `Origin`
+  de `WEB_ORIGINS`. La web llega a la API por el mismo origen (rewrite de Next).
+- **Registro de actividad** visible para el usuario: entradas, fallos, 2FA,
+  sesiones cerradas, cambios de contraseña.
+
+Variables: `AUTH_ENCRYPTION_KEY` (32 bytes en base64), `WATCH_OWNER_EMAIL` (a
+quién pertenece lo que entra por la carpeta), `ALLOW_SIGNUP` (ponelo en `false`
+después de crear tu cuenta si lo exponés), `WEB_ORIGINS`.
+
+Siguiente: login con Google (OIDC + PKCE), que también abre la puerta a Gmail y
+Calendar. Diseño en `docs/superpowers/specs/2026-10-27-auth-design.md`.
 
 ## Levantarlo
 
@@ -54,14 +85,17 @@ ollama pull qwen2.5:7b-instruct
 ```
 
 ```bash
-cp .env.example .env          # ajustar WATCH_DIR a la carpeta de papeles
+cp .env.example .env          # WATCH_DIR, AUTH_ENCRYPTION_KEY, WATCH_OWNER_EMAIL
 npm install && npm run web:install
-npm run db:up && npm run db:migrate
+npm run db:up && npm run db:deploy
 npm run dev                   # worker + API + web juntos (o por separado:)
 npm run worker                # terminal 1: carpeta observada + extracción
 npm run api                   # terminal 2: http://127.0.0.1:3010/api
 npm run web                   # terminal 3: http://localhost:3011
 ```
+
+Entrá a http://localhost:3011, creá tu cuenta con el email de `WATCH_OWNER_EMAIL`
+y activá la verificación en dos pasos desde Seguridad.
 
 `npm run llm:smoke` prueba el modelo contra un texto de ejemplo sin base ni cola.
 
@@ -77,13 +111,15 @@ revisa después.
 | `/review` | Cada propuesta con su evidencia resaltada y el documento; corregir, aceptar, fusionar o descartar |
 | `/obligations` | Todas, filtradas por estado y tipo; marcar como hecha |
 | `/documents` | Qué entró, en qué estado está, por qué falló; reprocesar |
+| `/settings/security` | Verificación en dos pasos, dispositivos con sesión abierta, contraseña, actividad |
+| `/login`, `/register` | Acceso; con 2FA, `/login/mfa` pide el código o uno de recuperación |
 
 ## Desarrollo
 
 ```bash
 npm test          # dominio y casos de uso: sin base, sin Docker, sin LLM
 npm run typecheck
-npm run db:smoke  # ida y vuelta contra Postgres real
+npm run db:smoke  # ida y vuelta contra Postgres real, incluido el aislamiento entre usuarios
 npm run web:build
 ```
 
@@ -92,13 +128,13 @@ Arquitectura hexagonal, igual que agent-platform: `src/domain` es puro,
 los adaptadores. API (NestJS) y worker (BullMQ) son procesos separados; la API
 no conoce el LLM.
 
-Diseño y plan: `docs/superpowers/specs/2026-10-27-life-os-mvp-design.md` y
-`docs/superpowers/plans/2026-10-27-life-os-mvp.md`.
+Diseño y planes en `docs/superpowers/specs` y `docs/superpowers/plans`;
+decisiones de arquitectura en `docs/adr`.
 
 ## Estado
 
-MVP del núcleo + brief, verificado con tests (unitarios y contra Postgres) y
-recorriendo la web. **Pendiente: la prueba con documentos reales**, que
+MVP del núcleo + brief y cuentas con 2FA, verificado con tests (unitarios y
+contra Postgres), con curl contra la API y recorriendo la web. **Pendiente: la prueba con documentos reales**, que
 necesita Ollama instalado; anotar acá cuántas propuestas fueron correctas,
 cuántas se descartaron y cuánto tardó cada documento.
 
