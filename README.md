@@ -61,16 +61,26 @@ igual que uno que no existe.
   (NIST SP 800-63B).
 - **Sin enumeración de cuentas:** email inexistente y contraseña incorrecta dan el
   mismo mensaje, y los dos verifican un hash argon2.
-- **Límite de intentos en Redis:** 5 fallos por email y 20 por IP en 15 minutos →
-  429 con `Retry-After`. Cinco códigos de 2FA incorrectos cierran la sesión pendiente.
-- **CSRF:** SameSite=Lax y, además, todo método que modifica exige un `Origin`
-  de `WEB_ORIGINS`. La web llega a la API por el mismo origen (rewrite de Next).
+- **Límite de intentos en Redis, atómico:** el intento se reserva antes de verificar
+  (INCR + EXPIRE NX en un MULTI), así una ráfaga en paralelo no prueba más que el
+  límite. 5 por email y 20 por IP en 15 minutos → 429 con `Retry-After`.
+- **El 2FA no se adivina:** 10 códigos por usuario cada 15 minutos, que no se
+  reinician al volver a poner la contraseña; 5 por sesión pendiente la cierran; la
+  sesión pendiente vence a los 10 minutos. El mismo código en dos pedidos
+  simultáneos sirve una sola vez (UPDATE condicional en Postgres).
+- **CSRF:** todo método que modifica exige un `Origin` de `WEB_ORIGINS`, y sin
+  `Origin` se rechaza: en localhost SameSite=Lax no separa puertos. La web llega a
+  la API por el mismo origen (rewrite de Next) y las dos escuchan sólo en
+  127.0.0.1. Con curl hay que mandar `-H Origin:http://localhost:3011`.
+- **Redirecciones:** `?next=` se resuelve como URL y sólo se sigue si es del mismo
+  origen (`/%09/evil.com` no sale del sitio).
 - **Registro de actividad** visible para el usuario: entradas, fallos, 2FA,
   sesiones cerradas, cambios de contraseña.
 
 Variables: `AUTH_ENCRYPTION_KEY` (32 bytes en base64), `WATCH_OWNER_EMAIL` (a
-quién pertenece lo que entra por la carpeta), `ALLOW_SIGNUP` (ponelo en `false`
-después de crear tu cuenta si lo exponés), `WEB_ORIGINS`.
+quién pertenece lo que entra por la carpeta; el worker lo fija al arrancar, así
+que se crea la cuenta primero), `ALLOW_SIGNUP` (`first` por defecto: sólo la
+primera cuenta; `true` abierto, `false` cerrado), `WEB_ORIGINS`.
 
 Siguiente: login con Google (OIDC + PKCE), que también abre la puerta a Gmail y
 Calendar. Diseño en `docs/superpowers/specs/2026-10-27-auth-design.md`.
@@ -94,8 +104,10 @@ npm run api                   # terminal 2: http://127.0.0.1:3010/api
 npm run web                   # terminal 3: http://localhost:3011
 ```
 
-Entrá a http://localhost:3011, creá tu cuenta con el email de `WATCH_OWNER_EMAIL`
-y activá la verificación en dos pasos desde Seguridad.
+Entrá a http://localhost:3011, creá tu cuenta (la primera; después el registro se
+cierra solo), activá la verificación en dos pasos desde Seguridad, poné ese email
+en `WATCH_OWNER_EMAIL` y reiniciá `npm run dev`: el worker recién ahí empieza a
+mirar la carpeta.
 
 `npm run llm:smoke` prueba el modelo contra un texto de ejemplo sin base ni cola.
 

@@ -1,4 +1,4 @@
-import { nextExpiry, type SessionRecord } from '../../domain/auth/session.js';
+import { MFA_PENDING_TIMEOUT_MS, nextExpiry, type SessionRecord } from '../../domain/auth/session.js';
 import { newSessionToken } from '../../domain/auth/session-token.js';
 import type {
   AuthEventLog,
@@ -22,7 +22,8 @@ export interface AuthDeps {
   events: AuthEventLog;
   clock: { now(): string };
   box: SecretBox;
-  allowSignup: boolean;
+  /** open: cualquiera; first: sólo la primera cuenta (default); closed: nadie. */
+  signup: 'open' | 'first' | 'closed';
 }
 
 export type AuthErrorKind =
@@ -64,7 +65,7 @@ export async function openSession(
     tokenHash: hash,
     createdAt: at,
     lastSeenAt: at,
-    expiresAt: nextExpiry(at, at),
+    expiresAt: mfaPending ? new Date(at.getTime() + MFA_PENDING_TIMEOUT_MS) : nextExpiry(at, at),
     revokedAt: null,
     mfaPending,
     userAgent: ctx.userAgent?.slice(0, 300) ?? null,

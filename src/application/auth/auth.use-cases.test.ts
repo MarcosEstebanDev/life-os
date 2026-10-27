@@ -24,7 +24,7 @@ const PASSWORD = 'una frase larga de prueba';
 const MIN = 60_000;
 const DAY = 86_400_000;
 
-function setup(overrides: Pick<Partial<AuthDeps>, 'allowSignup'> = {}) {
+function setup(overrides: Pick<Partial<AuthDeps>, 'signup'> = {}) {
   const deps = {
     users: new InMemoryUsers(),
     sessions: new InMemorySessions(),
@@ -34,7 +34,7 @@ function setup(overrides: Pick<Partial<AuthDeps>, 'allowSignup'> = {}) {
     events: new InMemoryAuthEvents(),
     clock: new MutableClock(),
     box: new FakeSecretBox(),
-    allowSignup: true,
+    signup: 'open' as AuthDeps['signup'],
     ...overrides,
   };
   return {
@@ -88,7 +88,7 @@ test('una contraseña corta o un email inválido no pasan', async () => {
 });
 
 test('con el registro cerrado no se pueden crear cuentas', async () => {
-  const app = setup({ allowSignup: false });
+  const app = setup({ signup: 'closed' });
   await rejectsWith(app.register.execute({ email: 'm@example.com', password: PASSWORD }, CTX), 'signup_closed');
 });
 
@@ -278,6 +278,46 @@ test('cinco códigos incorrectos cierran la sesión pendiente', async () => {
   const pending = (await app.authenticate.execute(token, { allowPending: true })).session;
   for (let i = 0; i < 5; i++) await rejectsWith(app.mfa.execute(pending, '000000', CTX), 'invalid_code');
   await rejectsWith(app.authenticate.execute(token, { allowPending: true }), 'unauthenticated');
+});
+
+test('el 2FA no se puede adivinar abriendo sesiones pendientes nuevas', async () => {
+  const app = setup();
+  const { secret } = await userWithTotp(app);
+  for (let round = 0; round < 2; round++) {
+    const { token } = await app.login.execute({ email: 'm@example.com', password: PASSWORD }, CTX);
+    const pending = (await app.authenticate.execute(token, { allowPending: true })).session;
+    for (let i = 0; i < 5; i++) await rejectsWith(app.mfa.execute(pending, '000000', CTX), 'invalid_code');
+  }
+  await rejectsWith(app.login.execute({ email: 'm@example.com', password: PASSWORD }, CTX), 'rate_limited');
+  const pending = [...app.sessions.items.values()].find((s) => s.mfaPending && !s.revokedAt);
+  if (pending) await rejectsWith(app.mfa.execute(pending, currentCode(app, secret), CTX), 'rate_limited');
+});
+
+test('el mismo código en dos sesiones pendientes en paralelo sirve una sola vez', async () => {
+  const app = setup();
+  const { secret } = await userWithTotp(app);
+  const pendingSession = async () =>
+    (await app.authenticate.execute((await app.login.execute({ email: 'm@example.com', password: PASSWORD }, CTX)).token, { allowPending: true })).session;
+  const [a, b] = [await pendingSession(), await pendingSession()];
+  const code = currentCode(app, secret);
+  const results = await Promise.allSettled([app.mfa.execute(a, code, CTX), app.mfa.execute(b, code, CTX)]);
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+});
+
+test('una sesión pendiente de 2FA vence a los 10 minutos y usarla no la estira', async () => {
+  const app = setup();
+  await userWithTotp(app);
+  const { token } = await app.login.execute({ email: 'm@example.com', password: PASSWORD }, CTX);
+  app.clock.advance(6 * MIN);
+  await app.authenticate.execute(token, { allowPending: true });
+  app.clock.advance(4 * MIN);
+  await rejectsWith(app.authenticate.execute(token, { allowPending: true }), 'unauthenticated');
+});
+
+test('con el registro en modo "primera cuenta", sólo se crea una', async () => {
+  const app = setup({ signup: 'first' });
+  await app.register.execute({ email: 'm@example.com', password: PASSWORD }, CTX);
+  await rejectsWith(app.register.execute({ email: 'otro@example.com', password: PASSWORD }, CTX), 'signup_closed');
 });
 
 test('desactivar 2FA exige contraseña y código', async () => {

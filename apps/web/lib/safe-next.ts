@@ -1,4 +1,12 @@
-/** Sólo rutas internas: un ?next=https://otro-sitio o //otro-sitio no redirige afuera. */
+const BASE = 'http://life-os.invalid';
+
+/**
+ * Sólo rutas internas. Comparar prefijos no alcanza: el parser de URL ignora
+ * tabs y saltos de línea, y `/\t/evil.com` termina en evil.com. Se resuelve
+ * la URL de verdad y se exige el mismo origen.
+ */
 export function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/brief';
+  if (!next || !next.startsWith('/')) return '/brief';
+  const url = new URL(next, BASE);
+  return url.origin === BASE ? url.pathname + url.search + url.hash : '/brief';
 }

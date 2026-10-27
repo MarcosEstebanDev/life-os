@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { nextExpiry } from './domain/auth/session.js';
 import { newSessionToken } from './domain/auth/session-token.js';
+import { Redis } from 'ioredis';
+import { RedisRateLimiter } from './infrastructure/auth/redis-rate-limiter.js';
 import { createPrismaClient } from './infrastructure/persistence/prisma.js';
 import { PrismaRecoveryCodeRepository, PrismaSessionRepository, PrismaUserRepository } from './infrastructure/persistence/prisma-auth.repositories.js';
 import { PrismaDocumentRepository } from './infrastructure/persistence/prisma-document.repository.js';
@@ -55,6 +57,24 @@ try {
   check(await recovery.consume(owner.id, 'h1', now), 'consumir código');
   check(!(await recovery.consume(owner.id, 'h1', now)), 'código reusado');
   check((await recovery.countUnused(owner.id)) === 1, 'códigos sin usar');
+
+  // Dos usos del mismo paso TOTP en paralelo: la base deja pasar uno solo.
+  const claims = await Promise.all([users.claimTotpStep(owner.id, 1000), users.claimTotpStep(owner.id, 1000)]);
+  check(claims.filter(Boolean).length === 1, `claimTotpStep en paralelo: ${claims}`);
+  check(!(await users.claimTotpStep(owner.id, 999)), 'un paso anterior no se acepta');
+
+  // Ráfaga de 10 intentos en paralelo con límite 5: Redis deja pasar exactamente 5.
+  const redis = new Redis(process.env.REDIS_URL!, { maxRetriesPerRequest: null });
+  try {
+    const limiter = new RedisRateLimiter(redis, 60, `lifeos:smoke:${randomUUID()}:`);
+    const results = await Promise.all(Array.from({ length: 10 }, () => limiter.consume([{ key: 'k', limit: 5 }])));
+    check(results.filter((r) => r === null).length === 5, `ráfaga: ${results.filter((r) => r === null).length} permitidos`);
+    check(results.every((r) => r === null || (r > 0 && r <= 60)), 'Retry-After dentro de la ventana');
+    check((await limiter.blockedFor([{ key: 'k', limit: 5 }])) !== null, 'blockedFor ve el bloqueo');
+    await limiter.reset('k');
+  } finally {
+    await redis.quit();
+  }
 
   console.log('db-smoke OK');
 } finally {

@@ -32,10 +32,10 @@ test('un modelo cloud de Ollama cuenta como remoto aunque la URL sea local', () 
   assert.equal(loadConfig({ ...base, LLM_MODEL: 'gpt-oss:120b-cloud', LLM_ALLOW_REMOTE: 'true' }).llm.allowRemote, true);
 });
 
-test('autenticación: orígenes de la web y registro abierto por defecto', () => {
+test('autenticación: orígenes de la web y registro sólo para la primera cuenta por defecto', () => {
   const config = loadConfig(base);
   assert.deepEqual(config.auth.webOrigins, ['http://localhost:3011', 'http://127.0.0.1:3011']);
-  assert.equal(config.auth.allowSignup, true);
+  assert.equal(config.auth.signup, 'first');
   assert.equal(config.auth.encryptionKey, null);
   assert.equal(config.watchOwnerEmail, null);
 });
@@ -46,7 +46,8 @@ test('autenticación: variables explícitas', () => {
     AUTH_ENCRYPTION_KEY: 'a2V5', WATCH_OWNER_EMAIL: ' User@Example.com ',
   });
   assert.deepEqual(config.auth.webOrigins, ['https://lifeos.example.com', 'http://localhost:3011']);
-  assert.equal(config.auth.allowSignup, false);
+  assert.equal(config.auth.signup, 'closed');
+  assert.equal(loadConfig({ ...base, ALLOW_SIGNUP: 'true' }).auth.signup, 'open');
   assert.equal(config.auth.encryptionKey, 'a2V5');
   assert.equal(config.watchOwnerEmail, 'user@example.com');
 });

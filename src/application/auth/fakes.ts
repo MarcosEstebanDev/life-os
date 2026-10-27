@@ -33,6 +33,15 @@ export class InMemoryUsers implements UserRepository {
   async update(id: string, patch: Partial<UserRecord>) {
     this.items.set(id, { ...(await this.get(id)), ...patch });
   }
+  async count() {
+    return this.items.size;
+  }
+  async claimTotpStep(id: string, step: number) {
+    const u = this.items.get(id);
+    if (!u || (u.totpLastStep !== null && u.totpLastStep >= step)) return false;
+    this.items.set(id, { ...u, totpLastStep: step });
+    return true;
+  }
 }
 
 export class InMemorySessions implements SessionRepository {
@@ -97,11 +106,12 @@ export class FakeHasher implements PasswordHasher {
 
 export class InMemoryRateLimiter implements RateLimiter {
   readonly failures = new Map<string, number>();
+  async consume(limits: RateLimit[]) {
+    for (const l of limits) this.failures.set(l.key, (this.failures.get(l.key) ?? 0) + 1);
+    return limits.some((l) => (this.failures.get(l.key) ?? 0) > l.limit) ? 900 : null;
+  }
   async blockedFor(limits: RateLimit[]) {
     return limits.some((l) => (this.failures.get(l.key) ?? 0) >= l.limit) ? 900 : null;
-  }
-  async recordFailure(keys: string[]) {
-    for (const k of keys) this.failures.set(k, (this.failures.get(k) ?? 0) + 1);
   }
   async reset(key: string) {
     this.failures.delete(key);

@@ -4,10 +4,11 @@
   "private": true,
   "description": "Web de life-os: brief, revisión, obligaciones y documentos",
   "scripts": {
-    "dev": "next dev -p 3011",
+    "dev": "next dev -H 127.0.0.1 -p 3011",
     "build": "next build",
-    "start": "next start -p 3011",
-    "typecheck": "tsc --noEmit"
+    "start": "next start -H 127.0.0.1 -p 3011",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ../../node_modules/tsx/dist/esm/index.mjs --test lib/*.test.ts"
   },
   "dependencies": {
     "next": "^15.5.4",

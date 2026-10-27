@@ -1,6 +1,8 @@
 export const IDLE_TIMEOUT_MS = 7 * 86_400_000;
 export const ABSOLUTE_TIMEOUT_MS = 30 * 86_400_000;
 export const TOUCH_INTERVAL_MS = 5 * 60_000;
+/** Pasó la contraseña y falta el código: diez minutos alcanzan para sacar el celular. */
+export const MFA_PENDING_TIMEOUT_MS = 10 * 60_000;
 
 export interface SessionRecord {
   id: string;

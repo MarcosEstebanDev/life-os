@@ -40,8 +40,9 @@ export class TotpUseCase {
     }
     const at = now(this.deps);
     const code = input.code.trim();
-    const ok = /^\d{6}$/.test(code)
-      ? verifyTotp(this.deps.box.open(user.totpSecretSealed), code, at, user.totpLastStep).ok
+    const totp = /^\d{6}$/.test(code) ? verifyTotp(this.deps.box.open(user.totpSecretSealed), code, at, user.totpLastStep) : null;
+    const ok = totp
+      ? totp.ok && (await this.deps.users.claimTotpStep(userId, totp.step))
       : await this.deps.recovery.consume(userId, hashToken(normalizeRecoveryCode(code)), at);
     if (!ok) throw new AuthError('invalid_code', 'el código no es válido');
 

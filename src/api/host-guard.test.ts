@@ -21,7 +21,10 @@ test('un POST desde la web pasa; desde otro sitio no', () => {
   assert.equal(isAllowedOrigin('DELETE', 'null', WEB), false);
 });
 
-test('las lecturas no se chequean y un cliente sin navegador (sin Origin) tampoco', () => {
+test('las lecturas no se chequean', () => {
   assert.equal(isAllowedOrigin('GET', 'https://evil.example.com', WEB), true);
-  assert.equal(isAllowedOrigin('POST', undefined, WEB), true);
+});
+
+test('un pedido que modifica sin Origin se rechaza: en localhost SameSite no separa puertos', () => {
+  assert.equal(isAllowedOrigin('POST', undefined, WEB), false);
 });

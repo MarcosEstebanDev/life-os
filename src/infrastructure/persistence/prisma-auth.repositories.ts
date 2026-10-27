@@ -28,6 +28,19 @@ export class PrismaUserRepository implements UserRepository {
   async update(id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>): Promise<void> {
     await this.prisma.user.update({ where: { id }, data: patch });
   }
+
+  count(): Promise<number> {
+    return this.prisma.user.count();
+  }
+
+  /** La condición va en el WHERE: Postgres serializa los dos UPDATE y sólo uno cambia la fila. */
+  async claimTotpStep(id: string, step: number): Promise<boolean> {
+    const { count } = await this.prisma.user.updateMany({
+      where: { id, OR: [{ totpLastStep: null }, { totpLastStep: { lt: step } }] },
+      data: { totpLastStep: step },
+    });
+    return count === 1;
+  }
 }
 
 export class PrismaSessionRepository implements SessionRepository {

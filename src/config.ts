@@ -13,7 +13,8 @@ export interface Config {
     encryptionKey: string | null;
     /** Orígenes de la web: un POST con otro Origin se rechaza. */
     webOrigins: string[];
-    allowSignup: boolean;
+    /** open: cualquiera; first: sólo la primera cuenta; closed: nadie. */
+    signup: 'open' | 'first' | 'closed';
   };
   /** Dueño de lo que entra por la carpeta observada. Sólo el worker lo exige. */
   watchOwnerEmail: string | null;
@@ -57,7 +58,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
     auth: {
       encryptionKey: env.AUTH_ENCRYPTION_KEY || null,
       webOrigins: (env.WEB_ORIGINS || 'http://localhost:3011,http://127.0.0.1:3011').split(',').map((o) => o.trim()).filter(Boolean),
-      allowSignup: env.ALLOW_SIGNUP !== 'false',
+      signup: env.ALLOW_SIGNUP === 'true' ? 'open' : env.ALLOW_SIGNUP === 'false' ? 'closed' : 'first',
     },
     watchOwnerEmail: env.WATCH_OWNER_EMAIL ? env.WATCH_OWNER_EMAIL.trim().toLowerCase() : null,
   };

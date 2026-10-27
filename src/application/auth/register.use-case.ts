@@ -8,7 +8,8 @@ export class RegisterUseCase {
 
   /** Registrarse deja la sesión abierta: no hay verificación de email todavía. */
   async execute(input: { email: string; password: string }, ctx: RequestContext): Promise<{ token: string; user: UserRecord }> {
-    if (!this.deps.allowSignup) throw new AuthError('signup_closed', 'el registro está cerrado');
+    const closed = this.deps.signup === 'closed' || (this.deps.signup === 'first' && (await this.deps.users.count()) > 0);
+    if (closed) throw new AuthError('signup_closed', 'el registro está cerrado');
     const email = normalizeEmail(input.email);
     const invalid = validateEmail(email) ?? validatePassword(input.password);
     if (invalid) throw new AuthError('validation', invalid);

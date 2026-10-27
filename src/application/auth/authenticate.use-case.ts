@@ -14,7 +14,8 @@ export class AuthenticateUseCase {
     if (session.mfaPending && !opts.allowPending) throw new AuthError('mfa_required', 'falta el segundo factor');
 
     let current = session;
-    if (shouldTouch(session, at)) {
+    // La pendiente de 2FA no se estira: vence a los 10 minutos de creada, se use o no.
+    if (!session.mfaPending && shouldTouch(session, at)) {
       current = { ...session, lastSeenAt: at, expiresAt: nextExpiry(session.createdAt, at) };
       await this.deps.sessions.update(session.id, { lastSeenAt: current.lastSeenAt, expiresAt: current.expiresAt });
     }

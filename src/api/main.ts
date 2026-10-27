@@ -11,8 +11,8 @@ const config = loadConfig(process.env);
 const port = config.port;
 const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ['log', 'error', 'warn'] });
 
-// La web llega por el rewrite de Next (proxy en loopback): la IP real viene en X-Forwarded-For.
-app.set('trust proxy', 'loopback');
+// Sin `trust proxy`: un X-Forwarded-For lo puede mandar cualquiera y Next no lo pisa.
+// La IP registrada es la del par directo; detrás del rewrite de Next, siempre loopback.
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (!isAllowedHost(req.headers.host, port)) return void res.status(403).json({ statusCode: 403, message: 'host no permitido' });
   if (!isAllowedOrigin(req.method, req.headers.origin, config.auth.webOrigins)) {

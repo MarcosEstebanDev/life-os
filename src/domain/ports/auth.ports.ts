@@ -17,6 +17,12 @@ export interface UserRepository {
   get(id: string): Promise<UserRecord>;
   create(input: { email: string; passwordHash: string }): Promise<UserRecord>;
   update(id: string, patch: Partial<Omit<UserRecord, 'id' | 'createdAt'>>): Promise<void>;
+  count(): Promise<number>;
+  /**
+   * Atómico: guarda `step` como último paso TOTP sólo si es posterior al guardado.
+   * Dos pedidos en paralelo con el mismo código: uno solo devuelve true.
+   */
+  claimTotpStep(id: string, step: number): Promise<boolean>;
 }
 
 export interface SessionRepository {
@@ -47,9 +53,14 @@ export interface RateLimit {
 }
 
 export interface RateLimiter {
-  /** Segundos hasta poder reintentar si alguna clave llegó a su límite; null si no. */
+  /**
+   * Reserva un intento en cada clave ANTES de verificar (atómico): una ráfaga en
+   * paralelo no prueba más que el límite. Devuelve segundos de espera si alguna
+   * clave lo pasó; null si el intento está permitido.
+   */
+  consume(limits: RateLimit[]): Promise<number | null>;
+  /** Sólo mira: segundos de espera si alguna clave ya llegó a su límite. */
   blockedFor(limits: RateLimit[]): Promise<number | null>;
-  recordFailure(keys: string[]): Promise<void>;
   reset(key: string): Promise<void>;
 }
 

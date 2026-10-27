@@ -91,7 +91,7 @@ function authDeps(config: Config, prisma: PrismaClient, redis: Redis): AuthDeps 
     events: new PrismaAuthEventLog(prisma),
     clock: new SystemClock(),
     box: new AesGcmSecretBox(config.auth.encryptionKey),
-    allowSignup: config.auth.allowSignup,
+    signup: config.auth.signup,
   };
 }
 
