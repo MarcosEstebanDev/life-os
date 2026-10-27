@@ -1,11 +1,13 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Post, Query } from '@nestjs/common';
 import { z } from 'zod';
 import type { CompleteObligationUseCase } from '../application/complete-obligation.use-case.js';
 import type { ReviewObligationUseCase } from '../application/review-obligation.use-case.js';
 import { isoDate } from '../domain/extraction-schema.js';
 import type { ObligationStatus } from '../domain/obligation.js';
 import type { ObligationRepository } from '../domain/ports/obligation-repository.port.js';
+import { CurrentAuth, type AuthContext } from './auth/session.guard.js';
 import { COMPLETE, OBLIGATIONS, REVIEW } from './tokens.js';
+import { IdParam } from './uuid-param.js';
 
 const STATUSES = ['PROPOSED', 'ACTIVE', 'DONE', 'DISMISSED'] as const;
 
@@ -32,38 +34,38 @@ export class ObligationsController {
   ) {}
 
   @Get()
-  list(@Query('status') status?: string) {
+  list(@CurrentAuth() auth: AuthContext, @Query('status') status?: string) {
     if (status && !STATUSES.includes(status as ObligationStatus)) {
       throw new BadRequestException(`status inválido: ${status}`);
     }
-    return this.obligations.list(status ? { status: status as ObligationStatus } : undefined);
+    return this.obligations.list(auth.user.id, status ? { status: status as ObligationStatus } : undefined);
   }
 
   @Post(':id/accept')
   @HttpCode(200)
-  accept(@Param('id') id: string, @Body() body: unknown) {
+  accept(@CurrentAuth() auth: AuthContext, @IdParam() id: string, @Body() body: unknown) {
     const edits = editsSchema.safeParse(body ?? {});
     if (!edits.success) {
       throw new BadRequestException(edits.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`));
     }
-    return this.review.accept(id, edits.data);
+    return this.review.accept(auth.user.id, id, edits.data);
   }
 
   @Post(':id/dismiss')
   @HttpCode(200)
-  dismiss(@Param('id') id: string) {
-    return this.review.dismiss(id);
+  dismiss(@CurrentAuth() auth: AuthContext, @IdParam() id: string) {
+    return this.review.dismiss(auth.user.id, id);
   }
 
   @Post(':id/merge')
   @HttpCode(200)
-  merge(@Param('id') id: string) {
-    return this.review.merge(id);
+  merge(@CurrentAuth() auth: AuthContext, @IdParam() id: string) {
+    return this.review.merge(auth.user.id, id);
   }
 
   @Post(':id/complete')
   @HttpCode(204)
-  async complete(@Param('id') id: string) {
-    await this.completeObligation.execute(id);
+  async complete(@CurrentAuth() auth: AuthContext, @IdParam() id: string) {
+    await this.completeObligation.execute(auth.user.id, id);
   }
 }

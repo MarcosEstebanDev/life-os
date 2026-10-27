@@ -10,6 +10,7 @@ import { SystemClock } from '../infrastructure/clock/system-clock.js';
 import { sha256File } from '../infrastructure/hash.js';
 import { OpenAiCompatibleAdapter } from '../infrastructure/llm/openai-compatible.adapter.js';
 import { createPrismaClient } from '../infrastructure/persistence/prisma.js';
+import { PrismaUserRepository } from '../infrastructure/persistence/prisma-auth.repositories.js';
 import { PrismaDocumentRepository } from '../infrastructure/persistence/prisma-document.repository.js';
 import { PrismaObligationRepository } from '../infrastructure/persistence/prisma-obligation.repository.js';
 import { BullMqJobQueue, EXTRACT_OBLIGATIONS, EXTRACT_TEXT, JOB_OPTIONS } from '../infrastructure/queue/bullmq-job-queue.js';
@@ -52,9 +53,27 @@ const workers = [
 ];
 for (const w of workers) w.on('failed', (job, err) => void markFailed(job, err));
 
+const users = new PrismaUserRepository(prisma);
+
+/**
+ * La carpeta es de un usuario. Se resuelve en cada archivo y no al arrancar:
+ * así crear la cuenta después no obliga a reiniciar el worker.
+ */
+async function watchOwnerId(): Promise<string | null> {
+  if (!config.watchOwnerEmail) {
+    console.warn('[watcher] falta WATCH_OWNER_EMAIL: no sé a quién pertenecen los archivos, no ingiero nada');
+    return null;
+  }
+  const owner = await users.findByEmail(config.watchOwnerEmail);
+  if (!owner) console.warn(`[watcher] no hay una cuenta con ${config.watchOwnerEmail}: registrate en la web y volvé a copiar el archivo`);
+  return owner?.id ?? null;
+}
+
 const watcher = startFolderWatcher(config.watchDir, async (path) => {
+  const ownerId = await watchOwnerId();
+  if (!ownerId) return;
   const [sha256, info] = await Promise.all([sha256File(path), stat(path)]);
-  const result = await ingest.execute({ path, sha256, sizeBytes: info.size });
+  const result = await ingest.execute({ path, sha256, sizeBytes: info.size, ownerId });
   console.log(`[ingest] ${result.status} ${path}`);
 });
 

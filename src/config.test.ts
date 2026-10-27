@@ -32,6 +32,25 @@ test('un modelo cloud de Ollama cuenta como remoto aunque la URL sea local', () 
   assert.equal(loadConfig({ ...base, LLM_MODEL: 'gpt-oss:120b-cloud', LLM_ALLOW_REMOTE: 'true' }).llm.allowRemote, true);
 });
 
+test('autenticación: orígenes de la web y registro abierto por defecto', () => {
+  const config = loadConfig(base);
+  assert.deepEqual(config.auth.webOrigins, ['http://localhost:3011', 'http://127.0.0.1:3011']);
+  assert.equal(config.auth.allowSignup, true);
+  assert.equal(config.auth.encryptionKey, null);
+  assert.equal(config.watchOwnerEmail, null);
+});
+
+test('autenticación: variables explícitas', () => {
+  const config = loadConfig({
+    ...base, WEB_ORIGINS: 'https://lifeos.example.com, http://localhost:3011', ALLOW_SIGNUP: 'false',
+    AUTH_ENCRYPTION_KEY: 'a2V5', WATCH_OWNER_EMAIL: ' User@Example.com ',
+  });
+  assert.deepEqual(config.auth.webOrigins, ['https://lifeos.example.com', 'http://localhost:3011']);
+  assert.equal(config.auth.allowSignup, false);
+  assert.equal(config.auth.encryptionKey, 'a2V5');
+  assert.equal(config.watchOwnerEmail, 'user@example.com');
+});
+
 test('falta una variable obligatoria', () => {
   assert.throws(() => loadConfig({ ...base, WATCH_DIR: undefined }), (e: unknown) => e instanceof ConfigError && /WATCH_DIR/.test(e.message));
 });
