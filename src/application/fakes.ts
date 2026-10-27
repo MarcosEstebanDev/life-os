@@ -1,3 +1,5 @@
+import type { JobQueue } from '../domain/ports/queue.port.js';
+import type { TextExtractor } from '../domain/ports/text-extractor.port.js';
 import type { Clock } from '../domain/ports/clock.port.js';
 import type { DocumentRecord, DocumentRepository } from '../domain/ports/document-repository.port.js';
 import type { LlmPort } from '../domain/ports/llm.port.js';
@@ -92,4 +94,25 @@ export class FixedClock implements Clock {
 export function sequentialIds(prefix = 'o'): () => string {
   let n = 0;
   return () => `${prefix}${++n}`;
+}
+
+export class RecordingQueue implements JobQueue {
+  readonly jobs: Array<{ name: 'extract-text' | 'extract-obligations'; documentId: string }> = [];
+  async enqueueExtractText(documentId: string) {
+    this.jobs.push({ name: 'extract-text', documentId });
+  }
+  async enqueueExtractObligations(documentId: string) {
+    this.jobs.push({ name: 'extract-obligations', documentId });
+  }
+}
+
+export class FakeTextExtractor implements TextExtractor {
+  constructor(private readonly result: string | Error) {}
+  supports(ext: string) {
+    return ['.pdf', '.txt', '.md'].includes(ext);
+  }
+  async extract() {
+    if (this.result instanceof Error) throw this.result;
+    return this.result;
+  }
 }
