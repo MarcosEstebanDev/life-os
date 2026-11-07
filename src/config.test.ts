@@ -62,3 +62,13 @@ test('defaults de puerto y LLM', () => {
   assert.equal(config.llm.baseUrl, 'http://localhost:11434/v1');
   assert.equal(config.llm.model, 'qwen2.5:7b-instruct');
 });
+
+test('timeout del LLM: alcanza para cargar el modelo en frío desde un disco lento', () => {
+  // Desde un disco lento cargar un 7B tarda más de 5 minutos: cortar antes aborta la carga y la cola reintenta sin fin.
+  assert.equal(loadConfig(base).llm.timeoutMs, 1_800_000);
+  assert.equal(loadConfig({ ...base, LLM_TIMEOUT_MS: '60000' }).llm.timeoutMs, 60_000);
+});
+
+test('timeout del LLM inválido no arranca', () => {
+  assert.throws(() => loadConfig({ ...base, LLM_TIMEOUT_MS: 'diez' }), (e: unknown) => e instanceof ConfigError && /LLM_TIMEOUT_MS/.test(e.message));
+});

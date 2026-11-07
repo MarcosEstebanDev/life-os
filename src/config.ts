@@ -7,7 +7,7 @@ export interface Config {
   redisUrl: string;
   watchDir: string;
   port: number;
-  llm: { baseUrl: string; apiKey: string; model: string; allowRemote: boolean };
+  llm: { baseUrl: string; apiKey: string; model: string; allowRemote: boolean; timeoutMs: number };
   auth: {
     /** 32 bytes en base64 para cifrar el secreto TOTP. Sólo la API la exige. */
     encryptionKey: string | null;
@@ -28,6 +28,20 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
   if (!value) throw new ConfigError(`falta la variable ${name}`);
   return value;
+}
+
+/**
+ * El timeout cuenta también la carga del modelo: desde un disco lento un 7B tarda más
+ * de 5 minutos en frío, y si el pedido se corta antes Ollama aborta la carga,
+ * así que cada reintento vuelve a empezar de cero. 30 minutos por pedido.
+ */
+const DEFAULT_LLM_TIMEOUT_MS = 30 * 60_000;
+
+function llmTimeout(raw: string | undefined): number {
+  if (!raw) return DEFAULT_LLM_TIMEOUT_MS;
+  const ms = Number(raw);
+  if (!Number.isInteger(ms) || ms <= 0) throw new ConfigError(`LLM_TIMEOUT_MS tiene que ser un entero de milisegundos, no "${raw}"`);
+  return ms;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv): Config {
@@ -54,6 +68,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       apiKey: env.LLM_API_KEY || 'ollama',
       model,
       allowRemote,
+      timeoutMs: llmTimeout(env.LLM_TIMEOUT_MS),
     },
     auth: {
       encryptionKey: env.AUTH_ENCRYPTION_KEY || null,
