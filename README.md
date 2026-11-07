@@ -22,7 +22,8 @@ carpeta observada ─▶ texto (pdf-parse) ─▶ LLM local propone obligaciones
 - **Nada cuenta sin revisión.** Lo que propone el modelo queda `PROPOSED` hasta
   que lo acepto; para aceptarlo hace falta una fecha.
 - **Sin evidencia no hay obligación.** Si el fragmento que cita el modelo no
-  aparece en el documento (comparación normalizada), se descarta.
+  aparece en el documento (comparación normalizada), se descarta. Puede pegar
+  hasta 3 fragmentos literales (la línea del vencimiento y la del total).
 - **Plazos relativos desde la fecha del documento.** "12 meses desde la emisión"
   se cuenta desde la emisión, no desde el día en que se procesó el PDF.
 - **Sin duplicados.** El resumen de cada mes de la misma tarjeta se reconoce
@@ -33,7 +34,10 @@ carpeta observada ─▶ texto (pdf-parse) ─▶ LLM local propone obligaciones
 
 - **Montos y fechas tienen que estar escritos en el texto.** Si el modelo lee
   `1.234` donde dice `$ 1.234,56`, o da vuelta día y mes, el dato queda vacío
-  y lo completo al revisar.
+  y lo completo al revisar. La fecha, además, tiene que estar en la evidencia
+  citada (en un resumen hay cierre, próximo cierre y vencimiento), y un plazo
+  relativo tiene que estar escrito ("12 meses", "30 días"): "el día 5 de cada
+  mes" no es "un mes y cinco días desde la emisión".
 
 ## Privacidad
 
@@ -111,9 +115,24 @@ mirar la carpeta.
 
 `npm run llm:smoke` prueba el modelo contra un texto de ejemplo sin base ni cola.
 
-En CPU (esta PC no tiene GPU usable para IA) un modelo de 7B tarda minutos por
-documento. Es un proceso en segundo plano: se deja el PDF en la carpeta y se
-revisa después.
+En CPU un modelo de 7B tarda entre 20 s y 2 min por documento de una página, y
+**cargarlo en frío desde un disco lento tarda unos 6 minutos**. Por eso el timeout por
+pedido es de 30 minutos (`LLM_TIMEOUT_MS`): si se corta antes, Ollama aborta la
+carga y cada reintento empieza de cero. Es un proceso en segundo plano: se deja
+el PDF en la carpeta y se revisa después.
+
+Si Ollama elige una GPU por Vulkan y la carga se cuelga ("timed out
+waiting for llama-server to start"). La salida es una variante que corre en CPU,
+que comparte el archivo del modelo (no ocupa disco extra):
+
+```bash
+printf 'FROM qwen2.5:7b-instruct\nPARAMETER num_gpu 0\n' > Modelfile.cpu
+ollama create qwen2.5:7b-instruct-cpu -f Modelfile.cpu
+# y en .env: LLM_MODEL=qwen2.5:7b-instruct-cpu
+```
+
+`WATCH_DIR` puede estar en una carpeta de prueba dentro del repo (`.local/inbox`,
+ignorada por git).
 
 ## Pantallas
 
@@ -146,9 +165,25 @@ decisiones de arquitectura en `docs/adr`.
 ## Estado
 
 MVP del núcleo + brief y cuentas con 2FA, verificado con tests (unitarios y
-contra Postgres), con curl contra la API y recorriendo la web. **Pendiente: la prueba con documentos reales**, que
-necesita Ollama instalado; anotar acá cuántas propuestas fueron correctas,
-cuántas se descartaron y cuánto tardó cada documento.
+contra Postgres), con curl contra la API y recorriendo la web.
+
+**Prueba de punta a punta con Ollama (2026-11-07)**, 5 PDFs sintéticos con texto
+(factura de luz, resumen de VISA con una cuota, turno médico, póliza de auto y un
+recibo de alquiler ya pagado), `qwen2.5:7b-instruct` en CPU:
+
+| Documento | Propuesto | Resultado |
+|---|---|---|
+| Factura de luz | Pagar 18/11 · $ 48.731,20 · y el 2.º vencimiento con recargo | correcto; el 2.º se descarta al revisar |
+| Resumen VISA | Pagar 10/11, sin monto | fecha bien; el monto lo calculó (total − mínimo) y quedó vacío: se completa al revisar |
+| Turno médico | Asistir 19/11 | correcto (sin contraparte) |
+| Póliza | Renovar 01/12/2026 · premio mensual $ 38.900 sin fecha | correcto; la fecha del débito se completa al revisar |
+| Recibo pagado | nada | correcto |
+
+La primera pasada encontró cuatro problemas (carpeta bajo `.local` ignorada,
+timeout que abortaba la carga del modelo, fecha de otra línea tomada como
+vencimiento, "día 5 de cada mes" leído como plazo relativo) y un turno que no
+salía; todo tiene test y quedó arreglado. Falta probar con papeles
+reales.
 
 ## Lo que viene
 
