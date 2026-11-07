@@ -1,7 +1,7 @@
 import { chunkText } from '../domain/chunk-text.js';
 import type { IsoDate } from '../domain/dates.js';
 import { decideDuplicate } from '../domain/dedupe.js';
-import { amountAppears, dateAppears, evidenceAppears } from '../domain/evidence.js';
+import { amountAppears, dateAppears, evidenceAppears, relativeAppears } from '../domain/evidence.js';
 import { extractionResultSchema, type ExtractionResult } from '../domain/extraction-schema.js';
 import type { Obligation } from '../domain/obligation.js';
 import type { Clock } from '../domain/ports/clock.port.js';
@@ -34,7 +34,7 @@ Reglas:
 - Si el plazo es relativo a la emisión ("12 meses desde la emisión"), usá "relative"; no lo calcules vos.
 - Un débito "el día 5 de cada mes" es recurrence "MONTHLY" con due { "type": "unknown" }, no un plazo relativo.
 - En un resumen de tarjeta, la obligación es pagar el total en la fecha de VENCIMIENTO (no la de cierre ni la de próximo cierre).
-- Con fecha absoluta, la evidencia tiene que incluir esa fecha escrita tal cual.
+- Con fecha absoluta, la evidencia tiene que incluir esa fecha escrita tal cual. Si la fecha y el monto están en líneas distintas, citá las dos líneas completas, una detrás de la otra.
 - Si no hay fecha clara, usá { "type": "unknown" }. No inventes fechas ni montos.
 - La evidencia tiene que estar en el texto tal cual. Si no podés citarla, no incluyas la obligación.
 - Si no hay obligaciones, devolvé "obligations": [].`;
@@ -109,8 +109,10 @@ export class ExtractObligationsUseCase {
       // La fecha, además, tiene que estar en la evidencia citada: en un resumen hay varias
       // (cierre, próximo cierre, vencimiento) y una fecha bien escrita pero de otra línea
       // es peor que ninguna, porque parece correcta.
-      const absoluteUnbacked = item.due.type === 'absolute' && !dateAppears(item.due.date, item.evidence);
-      const dueDate = absoluteUnbacked ? null : resolveDueDate(item.due, documentDate);
+      const unbacked =
+        (item.due.type === 'absolute' && !dateAppears(item.due.date, item.evidence)) ||
+        (item.due.type === 'relative' && !relativeAppears(item.due, item.evidence));
+      const dueDate = unbacked ? null : resolveDueDate(item.due, documentDate);
       const rawAmount = item.amount === null ? null : item.amount.toFixed(2);
       const amount = rawAmount && amountAppears(rawAmount, text) ? rawAmount : null;
       const decision = decideDuplicate({ seriesKey: key, dueDate, amount }, await this.obligations.findBySeries(doc.ownerId, key));

@@ -202,3 +202,14 @@ test('el prompt pide que la evidencia incluya la fecha y menciona turnos', async
   assert.match(llm.calls[0].system, /evidencia[^\n]*fecha/i);
   assert.match(llm.calls[0].system, /turno/i);
 });
+
+test('un plazo relativo que no está escrito en la evidencia no se calcula', async () => {
+  // Póliza real: "debitado el día 5 de cada mes" salió como 1 mes y 5 días desde la emisión.
+  const text = `${TEXT}\nPremio mensual: $ 38.900,00, debitado el día 5 de cada mes.`;
+  const premium = payment({ due: { type: 'relative', months: 1, days: 5 }, amount: 38900, evidence: 'Premio mensual: $ 38.900,00, debitado el día 5 de cada mes.' });
+  const { useCase, obligations, doc } = await setup([answer([premium])], text);
+  await useCase.execute(doc.id);
+  const [o] = await obligations.list('u1');
+  assert.equal(o.dueDate, null);
+  assert.equal(o.amount, '38900.00');
+});
