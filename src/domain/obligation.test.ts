@@ -17,7 +17,7 @@ function obligation(overrides: Partial<Obligation> = {}): Obligation {
     confidence: 0.9,
     status: 'PROPOSED',
     seriesKey: 'banco|PAYMENT|pagar tarjeta',
-    possibleUpdateOf: null,
+    possibleUpdateOf: null, ownerId: 'u1',
     doneAt: null,
     ...overrides,
   };

@@ -18,7 +18,8 @@
     "web": "npm --prefix apps/web run dev",
     "web:install": "npm --prefix apps/web install",
     "web:build": "npm --prefix apps/web run build",
-    "dev": "concurrently -k -n worker,api,web -c blue,green,magenta \"npm:worker\" \"npm:api\" \"npm:web\""
+    "dev": "concurrently -k -n worker,api,web -c blue,green,magenta \"npm:worker\" \"npm:api\" \"npm:web\"",
+    "db:deploy": "prisma migrate deploy && prisma generate"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -35,6 +36,7 @@
     "@nestjs/platform-express": "^11.2.8",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "argon2": "^0.43.1",
     "bullmq": "^6.5.0",
     "chokidar": "^4.0.3",
     "ioredis": "^6.0.0",

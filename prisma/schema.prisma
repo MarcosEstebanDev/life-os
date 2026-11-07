@@ -36,10 +36,71 @@ enum ObligationStatus {
   DISMISSED
 }
 
+model User {
+  id               String          @id @default(uuid()) @db.Uuid
+  email            String          @unique
+  passwordHash     String          @map("password_hash")
+  // Cifrado con AES-256-GCM (AUTH_ENCRYPTION_KEY); nunca en claro.
+  totpSecretSealed String?         @map("totp_secret_sealed")
+  totpEnabledAt    DateTime?       @map("totp_enabled_at")
+  totpLastStep     Int?            @map("totp_last_step")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  sessions         Session[]
+  recoveryCodes    RecoveryCode[]
+  documents        Document[]
+  obligations      Obligation[]
+
+  @@map("users")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SHA-256 del token de la cookie: la base no guarda sesiones utilizables.
+  tokenHash  String    @unique @map("token_hash")
+  createdAt  DateTime  @map("created_at")
+  lastSeenAt DateTime  @map("last_seen_at")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  mfaPending Boolean   @map("mfa_pending")
+  userAgent  String?   @map("user_agent")
+  ip         String?
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model RecoveryCode {
+  id       String    @id @default(uuid()) @db.Uuid
+  userId   String    @map("user_id") @db.Uuid
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash String    @map("code_hash")
+  usedAt   DateTime? @map("used_at")
+
+  @@unique([userId, codeHash])
+  @@map("recovery_codes")
+}
+
+model AuthEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  // Null en un login fallido con un email que no existe.
+  userId    String?  @map("user_id") @db.Uuid
+  type      String
+  ip        String?
+  userAgent String?  @map("user_agent")
+  at        DateTime
+
+  @@index([userId, at])
+  @@map("auth_events")
+}
+
 model Document {
   id          String         @id @default(uuid()) @db.Uuid
+  ownerId     String         @map("owner_id") @db.Uuid
+  owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   path        String
-  sha256      String         @unique
+  sha256      String
   mimeType    String         @map("mime_type")
   sizeBytes   Int            @map("size_bytes")
   status      DocumentStatus
@@ -48,11 +109,14 @@ model Document {
   createdAt   DateTime       @default(now()) @map("created_at")
   obligations Obligation[]
 
+  @@unique([ownerId, sha256])
   @@map("documents")
 }
 
 model Obligation {
   id               String           @id @db.Uuid
+  ownerId          String           @map("owner_id") @db.Uuid
+  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   title            String
   kind             ObligationKind
   // Sólo fecha: un vencimiento es un día, no un instante.
@@ -71,7 +135,7 @@ model Obligation {
   doneAt           DateTime?        @map("done_at")
   createdAt        DateTime         @default(now()) @map("created_at")
 
-  @@index([seriesKey])
-  @@index([status])
+  @@index([ownerId, seriesKey])
+  @@index([ownerId, status])
   @@map("obligations")
 }

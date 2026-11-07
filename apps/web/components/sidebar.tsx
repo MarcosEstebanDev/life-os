@@ -3,19 +3,21 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, auth } from '@/lib/api';
 
 const LINKS = [
   { href: '/brief', label: 'Hoy', badge: 'late' },
   { href: '/review', label: 'Revisar', badge: 'review' },
   { href: '/obligations', label: 'Obligaciones' },
   { href: '/documents', label: 'Documentos' },
+  { href: '/settings/security', label: 'Seguridad' },
 ] as const;
 
 /** Los contadores se refrescan al cambiar de pantalla: así se ven bajar al revisar. */
 export function Sidebar() {
   const path = usePathname();
   const [counts, setCounts] = useState<{ late: number; review: number } | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -23,6 +25,15 @@ export function Sidebar() {
       .then((b) => setCounts({ late: b.overdue.length, review: b.toReview.length }))
       .catch(() => setCounts(null));
   }, [path]);
+
+  useEffect(() => {
+    auth
+      .me()
+      .then((me) => setEmail(me.email))
+      .catch(() => setEmail(null));
+  }, []);
+
+  const signOut = () => auth.logout().finally(() => window.location.assign('/login'));
 
   return (
     <aside className="sidebar">
@@ -40,7 +51,12 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <p className="sidebar-foot">Dejá tus PDFs en la carpeta observada y revisá lo que encuentre.</p>
+      <div className="sidebar-foot">
+        {email && <span className="who" title={email}>{email}</span>}
+        <button className="quiet" onClick={signOut}>
+          Salir
+        </button>
+      </div>
     </aside>
   );
 }

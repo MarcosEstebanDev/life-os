@@ -1,5 +1,6 @@
 import type { JobQueue } from '../domain/ports/queue.port.js';
 import type { TextExtractor } from '../domain/ports/text-extractor.port.js';
+import { NotFoundError } from '../domain/errors.js';
 import type { Clock } from '../domain/ports/clock.port.js';
 import type { DocumentRecord, DocumentRepository } from '../domain/ports/document-repository.port.js';
 import type { LlmPort } from '../domain/ports/llm.port.js';
@@ -8,14 +9,18 @@ import type { Obligation, ObligationStatus } from '../domain/obligation.js';
 
 /** Dobles en memoria para probar casos de uso sin base, sin Docker y sin LLM. */
 
-export class NotFoundError extends Error {}
+export { NotFoundError };
 
 export class InMemoryDocuments implements DocumentRepository {
   readonly items = new Map<string, DocumentRecord>();
   private seq = 0;
 
-  async findBySha(sha: string) {
-    return [...this.items.values()].find((d) => d.sha256 === sha) ?? null;
+  async findBySha(ownerId: string, sha: string) {
+    return [...this.items.values()].find((d) => d.ownerId === ownerId && d.sha256 === sha) ?? null;
+  }
+  async findOwned(ownerId: string, id: string) {
+    const d = this.items.get(id);
+    return d && d.ownerId === ownerId ? d : null;
   }
   async create(d: Omit<DocumentRecord, 'id' | 'createdAt'>) {
     const record = { ...d, id: `doc${++this.seq}`, createdAt: '2026-10-27T10:00:00Z' };
@@ -27,19 +32,23 @@ export class InMemoryDocuments implements DocumentRepository {
     if (!d) throw new NotFoundError(id);
     return d;
   }
-  async update(id: string, patch: Partial<Omit<DocumentRecord, 'id'>>) {
+  async update(id: string, patch: Partial<Omit<DocumentRecord, 'id' | 'ownerId'>>) {
     this.items.set(id, { ...(await this.get(id)), ...patch });
   }
-  async list() {
-    return [...this.items.values()];
+  async list(ownerId: string) {
+    return [...this.items.values()].filter((d) => d.ownerId === ownerId);
   }
 }
 
 export class InMemoryObligations implements ObligationRepository {
   readonly items = new Map<string, Obligation>();
 
-  async findBySeries(key: string) {
-    return [...this.items.values()].filter((o) => o.seriesKey === key);
+  async findBySeries(ownerId: string, key: string) {
+    return [...this.items.values()].filter((o) => o.ownerId === ownerId && o.seriesKey === key);
+  }
+  async findOwned(ownerId: string, id: string) {
+    const o = this.items.get(id);
+    return o && o.ownerId === ownerId ? o : null;
   }
   async insert(o: Obligation) {
     this.items.set(o.id, o);
@@ -52,8 +61,8 @@ export class InMemoryObligations implements ObligationRepository {
     if (!o) throw new NotFoundError(id);
     return o;
   }
-  async list(filter?: { status?: ObligationStatus }) {
-    return [...this.items.values()].filter((o) => !filter?.status || o.status === filter.status);
+  async list(ownerId: string, filter?: { status?: ObligationStatus }) {
+    return [...this.items.values()].filter((o) => o.ownerId === ownerId && (!filter?.status || o.status === filter.status));
   }
   async deleteProposedByDocument(documentId: string) {
     let n = 0;

@@ -19,6 +19,8 @@ export interface Obligation {
   amount: string | null;
   currency: string | null;
   counterparty: string | null;
+  /** Usuario dueño: toda lectura filtra por él. */
+  ownerId: string;
   sourceDocumentId: string;
   /** Fragmentos literales del texto que justifican fecha y monto. */
   evidence: string[];

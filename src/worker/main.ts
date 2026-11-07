@@ -10,6 +10,7 @@ import { SystemClock } from '../infrastructure/clock/system-clock.js';
 import { sha256File } from '../infrastructure/hash.js';
 import { OpenAiCompatibleAdapter } from '../infrastructure/llm/openai-compatible.adapter.js';
 import { createPrismaClient } from '../infrastructure/persistence/prisma.js';
+import { PrismaUserRepository } from '../infrastructure/persistence/prisma-auth.repositories.js';
 import { PrismaDocumentRepository } from '../infrastructure/persistence/prisma-document.repository.js';
 import { PrismaObligationRepository } from '../infrastructure/persistence/prisma-obligation.repository.js';
 import { BullMqJobQueue, EXTRACT_OBLIGATIONS, EXTRACT_TEXT, JOB_OPTIONS } from '../infrastructure/queue/bullmq-job-queue.js';
@@ -52,16 +53,40 @@ const workers = [
 ];
 for (const w of workers) w.on('failed', (job, err) => void markFailed(job, err));
 
-const watcher = startFolderWatcher(config.watchDir, async (path) => {
-  const [sha256, info] = await Promise.all([sha256File(path), stat(path)]);
-  const result = await ingest.execute({ path, sha256, sizeBytes: info.size });
-  console.log(`[ingest] ${result.status} ${path}`);
-});
+const users = new PrismaUserRepository(prisma);
 
-console.log(`worker listo · carpeta ${config.watchDir} · modelo ${llm.modelName}`);
+/**
+ * La carpeta es de un usuario, y se fija al arrancar: si se resolviera en cada
+ * archivo, quien registrara ese email antes que el dueño se quedaría con los
+ * documentos que entren después. Sin dueño, el worker procesa la cola pero no
+ * mira la carpeta (y no se cae: `npm run dev` bajaría la API y la web con él).
+ */
+async function resolveWatchOwner(): Promise<string | null> {
+  if (!config.watchOwnerEmail) {
+    console.warn('[watcher] falta WATCH_OWNER_EMAIL en .env: no miro la carpeta.');
+    return null;
+  }
+  const owner = await users.findByEmail(config.watchOwnerEmail);
+  if (!owner) {
+    console.warn(`[watcher] no hay una cuenta con ${config.watchOwnerEmail}: creala en la web y reiniciá el worker. No miro la carpeta.`);
+    return null;
+  }
+  return owner.id;
+}
+
+const ownerId = await resolveWatchOwner();
+const watcher = ownerId
+  ? startFolderWatcher(config.watchDir, async (path) => {
+      const [sha256, info] = await Promise.all([sha256File(path), stat(path)]);
+      const result = await ingest.execute({ path, sha256, sizeBytes: info.size, ownerId });
+      console.log(`[ingest] ${result.status} ${path}`);
+    })
+  : null;
+
+console.log(`worker listo · ${watcher ? `carpeta ${config.watchDir} de ${config.watchOwnerEmail}` : 'sin carpeta'} · modelo ${llm.modelName}`);
 
 async function shutdown() {
-  await watcher.close();
+  await watcher?.close();
   await Promise.all(workers.map((w) => w.close()));
   await queue.close();
   await redis.quit();

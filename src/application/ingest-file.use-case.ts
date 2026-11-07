@@ -20,17 +20,18 @@ export class IngestFileUseCase {
     private readonly extractor: TextExtractor,
   ) {}
 
-  async execute(input: { path: string; sha256: string; sizeBytes: number }): Promise<{
+  async execute(input: { path: string; sha256: string; sizeBytes: number; ownerId: string }): Promise<{
     status: 'created' | 'duplicate' | 'unsupported';
     documentId?: string;
   }> {
     const ext = extname(input.path).toLowerCase();
     if (!this.extractor.supports(ext)) return { status: 'unsupported' };
 
-    const existing = await this.documents.findBySha(input.sha256);
+    const existing = await this.documents.findBySha(input.ownerId, input.sha256);
     if (existing) return { status: 'duplicate', documentId: existing.id };
 
     const doc = await this.documents.create({
+      ownerId: input.ownerId,
       path: input.path,
       sha256: input.sha256,
       mimeType: MIME_TYPES[ext] ?? 'application/octet-stream',

@@ -2,6 +2,7 @@ export type DocumentStatus = 'PENDING' | 'TEXT_EXTRACTED' | 'PROCESSED' | 'FAILE
 
 export interface DocumentRecord {
   id: string;
+  ownerId: string;
   path: string;
   sha256: string;
   mimeType: string;
@@ -12,10 +13,15 @@ export interface DocumentRecord {
   createdAt: string;
 }
 
+/**
+ * `get` es para el worker, que procesa documentos sin un usuario detrás.
+ * Todo lo que llega desde la API pasa por `findOwned` / `list(ownerId)`.
+ */
 export interface DocumentRepository {
-  findBySha(sha: string): Promise<DocumentRecord | null>;
+  findBySha(ownerId: string, sha: string): Promise<DocumentRecord | null>;
   create(d: Omit<DocumentRecord, 'id' | 'createdAt'>): Promise<DocumentRecord>;
   get(id: string): Promise<DocumentRecord>;
-  update(id: string, patch: Partial<Omit<DocumentRecord, 'id'>>): Promise<void>;
-  list(): Promise<DocumentRecord[]>;
+  findOwned(ownerId: string, id: string): Promise<DocumentRecord | null>;
+  update(id: string, patch: Partial<Omit<DocumentRecord, 'id' | 'ownerId'>>): Promise<void>;
+  list(ownerId: string): Promise<DocumentRecord[]>;
 }

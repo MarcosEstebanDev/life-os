@@ -8,7 +8,7 @@ export class GetBriefUseCase {
     private readonly clock: Clock,
   ) {}
 
-  async execute(): Promise<Brief> {
-    return computeBrief(await this.obligations.list(), this.clock.today());
+  async execute(ownerId: string): Promise<Brief> {
+    return computeBrief(await this.obligations.list(ownerId), this.clock.today());
   }
 }

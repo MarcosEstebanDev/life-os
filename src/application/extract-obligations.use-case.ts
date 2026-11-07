@@ -1,7 +1,7 @@
 import { chunkText } from '../domain/chunk-text.js';
 import type { IsoDate } from '../domain/dates.js';
 import { decideDuplicate } from '../domain/dedupe.js';
-import { amountAppears, dateAppears, evidenceAppears } from '../domain/evidence.js';
+import { amountAppears, dateAppears, evidenceAppears, relativeAppears } from '../domain/evidence.js';
 import { extractionResultSchema, type ExtractionResult } from '../domain/extraction-schema.js';
 import type { Obligation } from '../domain/obligation.js';
 import type { Clock } from '../domain/ports/clock.port.js';
@@ -12,7 +12,7 @@ import { resolveDueDate } from '../domain/resolve-due-date.js';
 import { seriesKey } from '../domain/series-key.js';
 
 function systemPrompt(today: IsoDate): string {
-  return `Sos un asistente que lee documentos personales (contratos, seguros, resúmenes, visas) y detecta obligaciones: pagos, renovaciones, plazos y vencimientos.
+  return `Sos un asistente que lee documentos personales (contratos, seguros, resúmenes, visas, turnos) y detecta obligaciones: pagos, renovaciones, plazos, vencimientos y turnos o citas con día y hora (médicos, trámites), que van como DEADLINE.
 Hoy es ${today}.
 Respondé SOLO un objeto JSON con esta forma:
 {
@@ -25,13 +25,16 @@ Respondé SOLO un objeto JSON con esta forma:
     "amount": <número con punto decimal, sin separador de miles> | null,
     "currency": "<código ISO 4217, ej. ARS, USD, NZD>" | null,
     "counterparty": "<empresa u organismo>" | null,
-    "evidence": "<fragmento COPIADO LITERAL del texto que justifica la fecha o el monto>",
+    "evidence": "<fragmento COPIADO LITERAL del texto; si hay fecha, el que la contiene>",
     "confidence": <0 a 1>
   }]
 }
 Reglas:
 - documentDate es la fecha de emisión o firma del documento, no la de hoy.
-- Si el plazo es relativo ("12 meses desde la emisión"), usá "relative"; no lo calcules vos.
+- Si el plazo es relativo a la emisión ("12 meses desde la emisión"), usá "relative"; no lo calcules vos.
+- Un débito "el día 5 de cada mes" es recurrence "MONTHLY" con due { "type": "unknown" }, no un plazo relativo.
+- En un resumen de tarjeta, la obligación es pagar el total en la fecha de VENCIMIENTO (no la de cierre ni la de próximo cierre).
+- Con fecha absoluta, la evidencia tiene que incluir esa fecha escrita tal cual. Si la fecha y el monto están en líneas distintas, citá las dos líneas completas, una detrás de la otra.
 - Si no hay fecha clara, usá { "type": "unknown" }. No inventes fechas ni montos.
 - La evidencia tiene que estar en el texto tal cual. Si no podés citarla, no incluyas la obligación.
 - Si no hay obligaciones, devolvé "obligations": [].`;
@@ -103,11 +106,16 @@ export class ExtractObligationsUseCase {
       }
       const key = seriesKey(item);
       // Fecha o monto que no están escritos en el texto quedan vacíos: los completo al revisar.
-      const absoluteUnbacked = item.due.type === 'absolute' && !dateAppears(item.due.date, text);
-      const dueDate = absoluteUnbacked ? null : resolveDueDate(item.due, documentDate);
+      // La fecha, además, tiene que estar en la evidencia citada: en un resumen hay varias
+      // (cierre, próximo cierre, vencimiento) y una fecha bien escrita pero de otra línea
+      // es peor que ninguna, porque parece correcta.
+      const unbacked =
+        (item.due.type === 'absolute' && !dateAppears(item.due.date, item.evidence)) ||
+        (item.due.type === 'relative' && !relativeAppears(item.due, item.evidence));
+      const dueDate = unbacked ? null : resolveDueDate(item.due, documentDate);
       const rawAmount = item.amount === null ? null : item.amount.toFixed(2);
       const amount = rawAmount && amountAppears(rawAmount, text) ? rawAmount : null;
-      const decision = decideDuplicate({ seriesKey: key, dueDate, amount }, await this.obligations.findBySeries(key));
+      const decision = decideDuplicate({ seriesKey: key, dueDate, amount }, await this.obligations.findBySeries(doc.ownerId, key));
 
       if (decision.action === 'attach') {
         const existing = await this.obligations.get(decision.to);
@@ -118,6 +126,7 @@ export class ExtractObligationsUseCase {
       }
       const proposal: Obligation = {
         id: this.newId(),
+        ownerId: doc.ownerId,
         title: item.title,
         kind: item.kind,
         dueDate,

@@ -9,6 +9,7 @@ import type { ObligationRepository } from '../../domain/ports/obligation-reposit
 function toDomain(row: Row): Obligation {
   return {
     id: row.id,
+    ownerId: row.ownerId,
     title: row.title,
     kind: row.kind,
     dueDate: row.dueDate ? row.dueDate.toISOString().slice(0, 10) : null,
@@ -38,8 +39,13 @@ function toRow(o: Obligation) {
 export class PrismaObligationRepository implements ObligationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findBySeries(key: string) {
-    return (await this.prisma.obligation.findMany({ where: { seriesKey: key } })).map(toDomain);
+  async findBySeries(ownerId: string, key: string) {
+    return (await this.prisma.obligation.findMany({ where: { ownerId, seriesKey: key } })).map(toDomain);
+  }
+
+  async findOwned(ownerId: string, id: string) {
+    const row = await this.prisma.obligation.findFirst({ where: { id, ownerId } });
+    return row ? toDomain(row) : null;
   }
 
   async insert(o: Obligation) {
@@ -55,9 +61,9 @@ export class PrismaObligationRepository implements ObligationRepository {
     return toDomain(await this.prisma.obligation.findUniqueOrThrow({ where: { id } }));
   }
 
-  async list(filter?: { status?: ObligationStatus }) {
+  async list(ownerId: string, filter?: { status?: ObligationStatus }) {
     const rows = await this.prisma.obligation.findMany({
-      where: filter?.status ? { status: filter.status } : {},
+      where: { ownerId, ...(filter?.status ? { status: filter.status } : {}) },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
     });
     return rows.map(toDomain);

@@ -42,7 +42,7 @@ function activeCard(overrides: Partial<Obligation> = {}): Obligation {
   return {
     id: 'vieja', title: 'Pagar tarjeta', kind: 'PAYMENT', dueDate: '2026-11-14', recurrence: 'MONTHLY', amount: '1234.56',
     currency: 'ARS', counterparty: 'Banco Ejemplo', sourceDocumentId: 'otro', evidence: ['antes'], confidence: 1,
-    status: 'ACTIVE', seriesKey: SERIES, possibleUpdateOf: null, doneAt: null, ...overrides,
+    status: 'ACTIVE', seriesKey: SERIES, possibleUpdateOf: null, ownerId: 'u1', doneAt: null, ...overrides,
   };
 }
 
@@ -50,7 +50,7 @@ async function setup(responses: string[], text = TEXT) {
   const docs = new InMemoryDocuments();
   const obligations = new InMemoryObligations();
   const llm = new FakeLlm(responses);
-  const doc = await docs.create({
+  const doc = await docs.create({ ownerId: 'u1',
     path: 'C:/papeles/resumen.pdf', sha256: 'abc', mimeType: 'application/pdf', sizeBytes: 10,
     status: 'TEXT_EXTRACTED', error: null, text,
   });
@@ -62,7 +62,7 @@ test('una respuesta válida deja una propuesta con evidencia y serie', async () 
   const { useCase, obligations, docs, doc } = await setup([answer([payment()])]);
   const result = await useCase.execute(doc.id);
   assert.deepEqual(result, { proposed: 1, attached: 0, discarded: 0 });
-  const [o] = await obligations.list();
+  const [o] = await obligations.list('u1');
   assert.equal(o.status, 'PROPOSED');
   assert.equal(o.dueDate, '2026-11-15');
   assert.equal(o.amount, '1234.56');
@@ -83,7 +83,7 @@ test('una obligación con evidencia inventada se descarta', async () => {
   const { useCase, obligations, doc } = await setup([answer([payment({ evidence: 'Vence el 20/12/2026 sin falta' })])]);
   const result = await useCase.execute(doc.id);
   assert.deepEqual(result, { proposed: 0, attached: 0, discarded: 1 });
-  assert.equal((await obligations.list()).length, 0);
+  assert.equal((await obligations.list('u1')).length, 0);
 });
 
 test('si la primera respuesta es inválida se reintenta una vez con el error', async () => {
@@ -91,7 +91,7 @@ test('si la primera respuesta es inválida se reintenta una vez con el error', a
   await useCase.execute(doc.id);
   assert.equal(llm.calls.length, 2);
   assert.match(llm.calls[1].user, /inválida/);
-  assert.equal((await obligations.list()).length, 1);
+  assert.equal((await obligations.list('u1')).length, 1);
 });
 
 test('dos respuestas inválidas dejan el documento FAILED', async () => {
@@ -105,13 +105,13 @@ test('dos respuestas inválidas dejan el documento FAILED', async () => {
 test('un plazo relativo se cuenta desde la fecha del documento', async () => {
   const { useCase, obligations, doc } = await setup([answer([visa()])]);
   await useCase.execute(doc.id);
-  assert.equal((await obligations.list())[0].dueDate, '2027-10-21');
+  assert.equal((await obligations.list('u1'))[0].dueDate, '2027-10-21');
 });
 
 test('una fecha de documento sin evidencia no se usa', async () => {
   const { useCase, obligations, doc } = await setup([answer([visa()], { date: '2026-10-21', evidence: 'issued on 21 October 2026' })]);
   await useCase.execute(doc.id);
-  assert.equal((await obligations.list())[0].dueDate, null);
+  assert.equal((await obligations.list('u1'))[0].dueDate, null);
 });
 
 test('la misma obligación en dos trozos queda una sola, con las dos evidencias', async () => {
@@ -120,7 +120,7 @@ test('la misma obligación en dos trozos queda una sola, con las dos evidencias'
   const { useCase, obligations, doc } = await setup([answer([payment()]), answer([second])], long);
   const result = await useCase.execute(doc.id);
   assert.deepEqual(result, { proposed: 1, attached: 1, discarded: 0 });
-  assert.equal((await obligations.list())[0].evidence.length, 2);
+  assert.equal((await obligations.list('u1'))[0].evidence.length, 2);
 });
 
 test('si ya existe la activa de la misma serie se le suma evidencia', async () => {
@@ -134,26 +134,26 @@ test('si ya existe la activa de la misma serie se le suma evidencia', async () =
 test('un monto que no aparece en el texto no se guarda: lo completo al revisar', async () => {
   const { useCase, obligations, doc } = await setup([answer([payment({ amount: 1.234 })])]);
   await useCase.execute(doc.id);
-  assert.equal((await obligations.list())[0].amount, null);
+  assert.equal((await obligations.list('u1'))[0].amount, null);
 });
 
 test('una fecha absoluta que no aparece en el texto (o leída mm/dd) no se guarda', async () => {
   const { useCase, obligations, doc } = await setup([answer([payment({ due: { type: 'absolute', date: '2026-12-20' } })])]);
   await useCase.execute(doc.id);
-  assert.equal((await obligations.list())[0].dueDate, null);
+  assert.equal((await obligations.list('u1'))[0].dueDate, null);
 });
 
 test('una fecha de documento que no aparece en el texto no se usa para plazos relativos', async () => {
   const { useCase, obligations, doc } = await setup([answer([visa()], { date: '2026-10-12', evidence: 'Fecha de emisión: 21/10/2026' })]);
   await useCase.execute(doc.id);
-  assert.equal((await obligations.list())[0].dueDate, null);
+  assert.equal((await obligations.list('u1'))[0].dueDate, null);
 });
 
 test('si un trozo falla dos veces, se usan los demás y el documento avisa', async () => {
   const long = `${TEXT}\n${'relleno '.repeat(1_000)}`;
   const { useCase, obligations, docs, doc } = await setup([answer([payment()]), 'roto', 'roto'], long);
   await useCase.execute(doc.id);
-  assert.equal((await obligations.list()).length, 1);
+  assert.equal((await obligations.list('u1')).length, 1);
   const d = await docs.get(doc.id);
   assert.equal(d.status, 'PROCESSED');
   assert.match(d.error ?? '', /^trozos inválidos 1\/2/);
@@ -164,7 +164,7 @@ test('procesar dos veces el mismo documento no duplica propuestas ni evidencia',
   await obligations.insert(activeCard({ id: 'otra', dueDate: '2027-06-01', seriesKey: 'x' }));
   await useCase.execute(doc.id);
   await useCase.execute(doc.id);
-  const proposed = await obligations.list({ status: 'PROPOSED' });
+  const proposed = await obligations.list('u1', { status: 'PROPOSED' });
   assert.equal(proposed.length, 1);
   assert.deepEqual(proposed[0].evidence, ['Vence el 15/11/2026']);
 });
@@ -180,7 +180,36 @@ test('un monto distinto para la misma fecha queda como posible actualización', 
   const { useCase, obligations, doc } = await setup([answer([payment({ amount: 999 })])], `${TEXT}\nAjuste: total $ 999,00.`);
   await obligations.insert(activeCard({ dueDate: '2026-11-15' }));
   await useCase.execute(doc.id);
-  const proposed = await obligations.list({ status: 'PROPOSED' });
+  const proposed = await obligations.list('u1', { status: 'PROPOSED' });
   assert.equal(proposed.length, 1);
   assert.equal(proposed[0].possibleUpdateOf, 'vieja');
+});
+
+test('una fecha absoluta que está en el texto pero no en su evidencia no se guarda', async () => {
+  // Resumen real: el modelo citó "Pago mínimo" y tomó el "Próximo cierre" como vencimiento.
+  const text = 'Fecha de cierre: 29/10/2026 Próximo cierre: 26/11/2026\nFecha de vencimiento: 10/11/2026\nPago mínimo: $ 45.000,00';
+  const minimum = payment({ due: { type: 'absolute', date: '2026-11-26' }, amount: 45000, evidence: 'Pago mínimo: $ 45.000,00' });
+  const { useCase, obligations, doc } = await setup([answer([minimum], null)], text);
+  await useCase.execute(doc.id);
+  const [o] = await obligations.list('u1');
+  assert.equal(o.dueDate, null);
+  assert.equal(o.amount, '45000.00');
+});
+
+test('el prompt pide que la evidencia incluya la fecha y menciona turnos', async () => {
+  const { useCase, llm, doc } = await setup([answer([payment()])]);
+  await useCase.execute(doc.id);
+  assert.match(llm.calls[0].system, /evidencia[^\n]*fecha/i);
+  assert.match(llm.calls[0].system, /turno/i);
+});
+
+test('un plazo relativo que no está escrito en la evidencia no se calcula', async () => {
+  // Póliza real: "debitado el día 5 de cada mes" salió como 1 mes y 5 días desde la emisión.
+  const text = `${TEXT}\nPremio mensual: $ 38.900,00, debitado el día 5 de cada mes.`;
+  const premium = payment({ due: { type: 'relative', months: 1, days: 5 }, amount: 38900, evidence: 'Premio mensual: $ 38.900,00, debitado el día 5 de cada mes.' });
+  const { useCase, obligations, doc } = await setup([answer([premium])], text);
+  await useCase.execute(doc.id);
+  const [o] = await obligations.list('u1');
+  assert.equal(o.dueDate, null);
+  assert.equal(o.amount, '38900.00');
 });
