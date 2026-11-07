@@ -184,3 +184,21 @@ test('un monto distinto para la misma fecha queda como posible actualización', 
   assert.equal(proposed.length, 1);
   assert.equal(proposed[0].possibleUpdateOf, 'vieja');
 });
+
+test('una fecha absoluta que está en el texto pero no en su evidencia no se guarda', async () => {
+  // Resumen real: el modelo citó "Pago mínimo" y tomó el "Próximo cierre" como vencimiento.
+  const text = 'Fecha de cierre: 29/10/2026 Próximo cierre: 26/11/2026\nFecha de vencimiento: 10/11/2026\nPago mínimo: $ 45.000,00';
+  const minimum = payment({ due: { type: 'absolute', date: '2026-11-26' }, amount: 45000, evidence: 'Pago mínimo: $ 45.000,00' });
+  const { useCase, obligations, doc } = await setup([answer([minimum], null)], text);
+  await useCase.execute(doc.id);
+  const [o] = await obligations.list('u1');
+  assert.equal(o.dueDate, null);
+  assert.equal(o.amount, '45000.00');
+});
+
+test('el prompt pide que la evidencia incluya la fecha y menciona turnos', async () => {
+  const { useCase, llm, doc } = await setup([answer([payment()])]);
+  await useCase.execute(doc.id);
+  assert.match(llm.calls[0].system, /evidencia[^\n]*fecha/i);
+  assert.match(llm.calls[0].system, /turno/i);
+});
