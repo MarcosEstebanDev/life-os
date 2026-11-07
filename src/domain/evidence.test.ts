@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { amountAppears, dateAppears, evidenceAppears, normalizeText } from './evidence.js';
+import { amountAppears, dateAppears, evidenceAppears, normalizeText, relativeAppears } from './evidence.js';
 
 test('un monto aparece en formato argentino o internacional', () => {
   assert.equal(amountAppears('1234.56', 'Total a pagar $ 1.234,56.'), true);
@@ -43,4 +43,32 @@ test('evidencia inventada no aparece', () => {
 
 test('evidencia demasiado corta no cuenta', () => {
   assert.equal(evidenceAppears('ok', 'todo ok'), false);
+});
+
+const RESUMEN = [
+  'Fecha de cierre: 29/10/2026 Próximo cierre: 26/11/2026',
+  'Fecha de vencimiento: 10/11/2026',
+  'Detalle de consumos',
+  'Saldo actual / Total a pagar: $ 312.540,85',
+].join('\n');
+
+test('la evidencia puede unir fragmentos literales de líneas distintas (fecha y monto)', () => {
+  // Respuesta real del modelo: pegó la línea del vencimiento con la del total.
+  assert.equal(evidenceAppears('Fecha de vencimiento: 10/11/2026 Saldo actual / Total a pagar: $ 312.540,85', RESUMEN), true);
+});
+
+test('unir fragmentos no deja pasar uno inventado ni pedacitos sueltos', () => {
+  assert.equal(evidenceAppears('Fecha de vencimiento: 10/11/2026 Total a pagar con descuento: $ 300.000,00', RESUMEN), false);
+  // Palabras sueltas del texto en otro orden no son evidencia.
+  assert.equal(evidenceAppears('pagar cierre fecha total consumos vencimiento saldo detalle', RESUMEN), false);
+});
+
+test('un plazo relativo tiene que estar escrito en la evidencia', () => {
+  assert.equal(relativeAppears({ months: 12, days: 0 }, 'must be used within 12 months of issue'), true);
+  assert.equal(relativeAppears({ months: 12, days: 0 }, 'tiene una vigencia de 1 año desde la firma'), true);
+  assert.equal(relativeAppears({ months: 0, days: 30 }, 'dentro de los 30 días corridos'), true);
+  assert.equal(relativeAppears({ months: 2, days: 0 }, 'renovar dentro de los dos meses'), true);
+  // "el día 5 de cada mes" no es "1 mes y 5 días desde la emisión".
+  assert.equal(relativeAppears({ months: 1, days: 5 }, 'Premio mensual: $ 38.900,00, debitado el día 5 de cada mes.'), false);
+  assert.equal(relativeAppears({ months: 0, days: 0 }, 'vence al emitirse'), false);
 });
