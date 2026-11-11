@@ -26,6 +26,7 @@ enum ObligationKind {
 enum Recurrence {
   NONE
   MONTHLY
+  QUARTERLY
   YEARLY
 }
 

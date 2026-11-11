@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { CompleteObligationUseCase } from '../application/complete-obligation.use-case.js';
 import type { ReviewObligationUseCase } from '../application/review-obligation.use-case.js';
 import { isoDate } from '../domain/extraction-schema.js';
-import type { ObligationStatus } from '../domain/obligation.js';
+import { RECURRENCES, type ObligationStatus } from '../domain/obligation.js';
 import type { ObligationRepository } from '../domain/ports/obligation-repository.port.js';
 import { CurrentAuth, type AuthContext } from './auth/session.guard.js';
 import { COMPLETE, OBLIGATIONS, REVIEW } from './tokens.js';
@@ -17,7 +17,7 @@ const editsSchema = z
     title: z.string().min(1),
     kind: z.enum(['PAYMENT', 'RENEWAL', 'DEADLINE', 'EXPIRY', 'OTHER']),
     dueDate: isoDate.nullable(),
-    recurrence: z.enum(['NONE', 'MONTHLY', 'YEARLY']),
+    recurrence: z.enum(RECURRENCES),
     amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/).nullable(),
     currency: z.string().regex(/^[A-Z]{3}$/).nullable(),
     counterparty: z.string().nullable(),

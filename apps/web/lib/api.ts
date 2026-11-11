@@ -14,7 +14,7 @@ export class ApiError extends Error {
 }
 
 export type ObligationKind = 'PAYMENT' | 'RENEWAL' | 'DEADLINE' | 'EXPIRY' | 'OTHER';
-export type Recurrence = 'NONE' | 'MONTHLY' | 'YEARLY';
+export type Recurrence = 'NONE' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 export type ObligationStatus = 'PROPOSED' | 'ACTIVE' | 'DONE' | 'DISMISSED';
 
 export interface Obligation {
@@ -140,7 +140,7 @@ export const KIND_LABELS: Record<ObligationKind, string> = {
   OTHER: 'Otro',
 };
 
-export const RECURRENCE_LABELS: Record<Recurrence, string> = { NONE: 'Única', MONTHLY: 'Mensual', YEARLY: 'Anual' };
+export const RECURRENCE_LABELS: Record<Recurrence, string> = { NONE: 'Única', MONTHLY: 'Mensual', QUARTERLY: 'Trimestral', YEARLY: 'Anual' };
 
 export function formatDate(d: string | null): string {
   if (!d) return 'sin fecha';

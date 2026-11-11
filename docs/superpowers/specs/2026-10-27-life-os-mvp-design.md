@@ -73,7 +73,7 @@ contenido de un path, es un Document nuevo; las obligaciones del anterior quedan
 
 **Obligation:**
 - title, kind (`PAYMENT | RENEWAL | DEADLINE | EXPIRY | OTHER`)
-- dueDate (fecha, sin hora), recurrence (`NONE | MONTHLY | YEARLY`)
+- dueDate (fecha, sin hora), recurrence (`NONE | MONTHLY | QUARTERLY | YEARLY`; trimestral sumada el 2026-11-11)
 - amount (decimal, opcional) + currency (ISO 4217, opcional)
 - counterparty (opcional)
 - sourceDocumentId + **evidence** (fragmento literal del texto que justifica la fecha/monto)

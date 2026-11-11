@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RECURRENCES } from './obligation.js';
 
 /** El regex solo deja pasar "2027-02-30", que `Date` corre en silencio al 2 de marzo. */
 export const isoDate = z
@@ -21,7 +22,7 @@ export const extractedObligationSchema = z.object({
   title: z.string().min(3),
   kind: z.enum(['PAYMENT', 'RENEWAL', 'DEADLINE', 'EXPIRY', 'OTHER']),
   due: dueSchema,
-  recurrence: z.enum(['NONE', 'MONTHLY', 'YEARLY']),
+  recurrence: z.enum(RECURRENCES),
   // Decimal(12,2): un CBU o un número de póliza tomado como monto no entra.
   amount: z.number().nonnegative().lt(1e10).nullable(),
   currency: z.string().regex(/^[A-Z]{3}$/, 'código ISO 4217').nullable(),

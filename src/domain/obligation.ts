@@ -1,7 +1,11 @@
 import { addMonths, type IsoDate } from './dates.js';
 
 export type ObligationKind = 'PAYMENT' | 'RENEWAL' | 'DEADLINE' | 'EXPIRY' | 'OTHER';
-export type Recurrence = 'NONE' | 'MONTHLY' | 'YEARLY';
+/** Fuente única: el esquema del LLM, la API y la web validan contra esta lista. */
+export const RECURRENCES = ['NONE', 'MONTHLY', 'QUARTERLY', 'YEARLY'] as const;
+export type Recurrence = (typeof RECURRENCES)[number];
+
+const RECURRENCE_MONTHS: Record<Exclude<Recurrence, 'NONE'>, number> = { MONTHLY: 1, QUARTERLY: 3, YEARLY: 12 };
 export type ObligationStatus = 'PROPOSED' | 'ACTIVE' | 'DONE' | 'DISMISSED';
 
 /**
@@ -60,7 +64,7 @@ export function complete(
   requireStatus(o, 'ACTIVE', 'completar');
   const done: Obligation = { ...o, status: 'DONE', doneAt: now };
   if (o.recurrence === 'NONE' || !o.dueDate) return { done, next: null };
-  const months = o.recurrence === 'MONTHLY' ? 1 : 12;
+  const months = RECURRENCE_MONTHS[o.recurrence];
   const next: Obligation = { ...o, id: newId, dueDate: addMonths(o.dueDate, months), doneAt: null, possibleUpdateOf: null };
   return { done, next };
 }
