@@ -1,0 +1,10 @@
+FIBRANET (ficticia) - Factura de servicio
+Cliente: Juan Pérez (ficticio)
+Fecha de emision: 20/10/2026
+Periodo: octubre 2026
+Fecha de vencimiento: 05/11/2026
+Total: $ 32.990,00
+Si ya abono esta factura, desestime este aviso.
+Documento de ejemplo generado para pruebas de life-os. Datos ficticios.
+
+-- 1 of 1 --

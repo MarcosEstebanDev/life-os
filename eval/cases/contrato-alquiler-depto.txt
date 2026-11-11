@@ -1,0 +1,11 @@
+CONTRATO DE LOCACION (ejemplo)
+Locador: Inmobiliaria Centro SRL (ficticia)
+Locatario: Juan Pérez (ficticio)
+Fecha de firma: 01/03/2026
+Duracion: 24 meses, desde 01/03/2026 hasta 28/02/2028
+Canon mensual: $ 520.000,00
+El alquiler se paga del 1 al 10 de cada mes. Proximo pago: 10/12/2026.
+Actualizacion semestral por indice ICL; proxima actualizacion: 01/03/2027.
+Documento de ejemplo generado para pruebas de life-os. Datos ficticios.
+
+-- 1 of 1 --

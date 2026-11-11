@@ -1,0 +1,9 @@
+CONSTANCIA DE TURNO (ejemplo)
+Tramite: renovacion de pasaporte
+Solicitante: Juan Pérez (ficticio)
+Fecha de emision: 05/11/2026
+Fecha del turno: 19/11/2026 a las 10:30
+Arancel: $ 75.000,00, a abonar antes del turno.
+Documento de ejemplo generado para pruebas de life-os. Datos ficticios.
+
+-- 1 of 1 --

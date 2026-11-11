@@ -1,0 +1,31 @@
+{
+  "_doc": "Lo que tendría que salir de cada caso. due: fechas aceptables (null = sin fecha). kind: tipos aceptables. amount: string decimal o se omite si no importa. Hoy fijo: 2026-11-11.",
+  "contrato-alquiler-depto": [
+    { "label": "alquiler", "due": ["2026-12-10"], "kind": ["PAYMENT"], "recurrence": "MONTHLY", "amount": "520000.00" },
+    { "label": "actualización (semestral → NONE)", "due": ["2027-03-01"], "kind": ["RENEWAL", "DEADLINE", "OTHER"], "recurrence": "NONE" }
+  ],
+  "ejemplo-banco": [
+    { "label": "cuota préstamo 4/12", "due": ["2026-12-10"], "kind": ["PAYMENT"], "recurrence": "MONTHLY", "amount": "125000.00" }
+  ],
+  "ejemplo-gastos-fijos": [
+    { "label": "seguro hogar mensual", "due": ["2026-12-20"], "kind": ["PAYMENT"], "recurrence": "MONTHLY", "amount": "18500.00" },
+    { "label": "patente (bimestral → NONE)", "due": ["2027-01-15"], "kind": ["PAYMENT"], "recurrence": "NONE", "amount": "96000.00" },
+    { "label": "renovar pasaporte", "due": ["2027-06-30"], "kind": ["RENEWAL", "DEADLINE", "EXPIRY"], "recurrence": "NONE" }
+  ],
+  "factura-internet-fibra-oct-2026": [
+    { "label": "factura internet", "due": ["2026-11-05"], "kind": ["PAYMENT"], "recurrence": "MONTHLY", "amount": "32990.00" }
+  ],
+  "monotributo-cuota-nov-2026": [
+    { "label": "cuota mensual", "due": ["2026-11-20"], "kind": ["PAYMENT"], "recurrence": "MONTHLY", "amount": "41280.00" }
+  ],
+  "poliza-seguro-auto-2026": [
+    { "label": "renovación anual", "due": ["2026-12-01"], "kind": ["RENEWAL", "PAYMENT"], "recurrence": "YEARLY", "amount": "1150000.00" }
+  ],
+  "resumen-tarjeta-visa-nov-2026": [
+    { "label": "pagar total", "due": ["2026-11-13"], "kind": ["PAYMENT"], "recurrence": "MONTHLY", "amount": "486320.55" }
+  ],
+  "turno-renovacion-pasaporte": [
+    { "label": "turno", "due": ["2026-11-19"], "kind": ["DEADLINE"], "recurrence": "NONE" },
+    { "label": "arancel", "due": ["2026-11-19", null], "kind": ["PAYMENT"], "recurrence": "NONE", "amount": "75000.00" }
+  ]
+}

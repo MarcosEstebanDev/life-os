@@ -1,0 +1,10 @@
+ASEGURADORA AUSTRAL S.A. (ficticia) - Poliza de seguro automotor
+Asegurado: Juan Pérez (ficticio)
+Poliza N 55-120934
+Vigencia: desde 01/12/2025 hasta 01/12/2026
+Cobertura: Terceros completo
+Premio anual: $ 1.150.000,00
+La poliza se renueva anualmente. La renovacion debe confirmarse antes del 01/12/2026.
+Documento de ejemplo generado para pruebas de life-os. Datos ficticios.
+
+-- 1 of 1 --

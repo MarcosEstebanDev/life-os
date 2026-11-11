@@ -1,0 +1,12 @@
+BANCO DEL LITORAL (ficticio) - Resumen de cuenta Tarjeta Visa
+Titular: Juan Pérez (ficticio)
+Fecha de emision: 02/11/2026
+Cierre actual: 30/10/2026
+Proximo cierre: 27/11/2026
+Fecha de vencimiento: 13/11/2026
+Total a pagar: $ 486.320,55
+Pago minimo: $ 48.632,05
+Pagando despues del vencimiento se aplican intereses punitorios.
+Documento de ejemplo generado para pruebas de life-os. Datos ficticios.
+
+-- 1 of 1 --

@@ -1,0 +1,7 @@
+## Hoja: Gastos fijos
+Concepto | Vence | Monto | Frecuencia
+Seguro del hogar (póliza 55-1234, ejemplo) | 20/12/2026 | 18500 | mensual
+Patente del auto (ejemplo) | 15/01/2027 | 96000 | bimestral
+
+## Hoja: Notas
+Renovar el pasaporte antes del 30/06/2027 (ejemplo)

@@ -1,0 +1,9 @@
+VOLANTE DE PAGO - Cuota mensual (ejemplo)
+Contribuyente: Juan Pérez (ficticio)
+Fecha de emision: 01/11/2026
+Periodo: 11/2026
+Fecha de vencimiento: 20/11/2026
+Importe: $ 41.280,00
+Documento de ejemplo generado para pruebas de life-os. Datos ficticios.
+
+-- 1 of 1 --

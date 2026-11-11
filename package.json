@@ -19,7 +19,8 @@
     "web:install": "npm --prefix apps/web install",
     "web:build": "npm --prefix apps/web run build",
     "dev": "concurrently -k -n worker,api,web -c blue,green,magenta \"npm:worker\" \"npm:api\" \"npm:web\"",
-    "db:deploy": "prisma migrate deploy && prisma generate"
+    "db:deploy": "prisma migrate deploy && prisma generate",
+    "eval:extraction": "tsx --env-file-if-exists=.env src/eval/extraction-eval.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

@@ -1,0 +1,2 @@
+Fecha;Descripción;Importe
+10/12/2026;Cuota préstamo personal 4/12 (ejemplo);125000
