@@ -32,7 +32,7 @@ export default function DocumentsPage() {
       {error && <p className="notice error">No se pudo cargar la lista ({error}).</p>}
       {actionError && <p className="notice error">{actionError}</p>}
       {data?.length === 0 && (
-        <p className="empty">Todavía no entró ningún documento. Copiá un PDF con texto a la carpeta observada y va a aparecer acá.</p>
+        <p className="empty">Todavía no entró ningún documento. Copiá un PDF con texto, un .csv o un .xlsx a la carpeta observada y va a aparecer acá.</p>
       )}
       {data?.map((d) => (
         <div key={d.id} className="doc">
