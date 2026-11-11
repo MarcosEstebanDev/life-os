@@ -2,7 +2,12 @@ import { chunkText } from '../domain/chunk-text.js';
 import type { IsoDate } from '../domain/dates.js';
 import { decideDuplicate } from '../domain/dedupe.js';
 import { amountAppears, dateAppears, evidenceAppears, relativeAppears } from '../domain/evidence.js';
-import { extractionResultSchema, type ExtractionResult } from '../domain/extraction-schema.js';
+import {
+  extractedObligationSchema,
+  extractionEnvelopeSchema,
+  extractionResultSchema,
+  type ExtractionResult,
+} from '../domain/extraction-schema.js';
 import type { Obligation } from '../domain/obligation.js';
 import type { Clock } from '../domain/ports/clock.port.js';
 import type { DocumentRepository } from '../domain/ports/document-repository.port.js';
@@ -40,19 +45,42 @@ Reglas:
 - Si no hay obligaciones, devolvé "obligations": [].`;
 }
 
-type ParseOutcome = { ok: true; value: ExtractionResult } | { ok: false; error: string };
+type Parsed = { value: ExtractionResult; invalid: string[] };
+type ParseOutcome = ({ ok: true } & Parsed) | { ok: false; error: string };
 
-function parse(raw: string): ParseOutcome {
+function describe(issues: { path: PropertyKey[]; message: string }[], prefix: PropertyKey[] = []): string {
+  return issues
+    .slice(0, 3)
+    .map((i) => `${[...prefix, ...i.path].map(String).join('.')}: ${i.message}`)
+    .join('; ');
+}
+
+/**
+ * Estricto: cualquier obligación inválida invalida la respuesta (y dispara el reintento).
+ * Tolerante: alcanza con que la forma de afuera sea válida; las obligaciones inválidas
+ * se apartan con su motivo.
+ */
+function parse(raw: string, mode: 'strict' | 'lenient'): ParseOutcome {
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch (e) {
     return { ok: false, error: `JSON mal formado: ${(e as Error).message}` };
   }
-  const result = extractionResultSchema.safeParse(json);
-  if (result.success) return { ok: true, value: result.data };
-  const issues = result.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}: ${i.message}`);
-  return { ok: false, error: issues.join('; ') };
+  const strict = extractionResultSchema.safeParse(json);
+  if (strict.success) return { ok: true, value: strict.data, invalid: [] };
+  if (mode === 'strict') return { ok: false, error: describe(strict.error.issues) };
+
+  const envelope = extractionEnvelopeSchema.safeParse(json);
+  if (!envelope.success) return { ok: false, error: describe(strict.error.issues) };
+  const value: ExtractionResult = { documentDate: envelope.data.documentDate, obligations: [] };
+  const invalid: string[] = [];
+  envelope.data.obligations.forEach((item, index) => {
+    const parsed = extractedObligationSchema.safeParse(item);
+    if (parsed.success) value.obligations.push(parsed.data);
+    else invalid.push(describe(parsed.error.issues, ['obligations', index]));
+  });
+  return { ok: true, value, invalid };
 }
 
 class InvalidLlmResponse extends Error {}
@@ -81,9 +109,12 @@ export class ExtractObligationsUseCase {
     const chunks = chunkText(text);
     const results: ExtractionResult[] = [];
     const failures: string[] = [];
+    const invalid: string[] = [];
     for (const chunk of chunks) {
       try {
-        results.push(await this.ask(chunk));
+        const parsed = await this.ask(chunk);
+        results.push(parsed.value);
+        invalid.push(...parsed.invalid);
       } catch (e) {
         if (!(e instanceof InvalidLlmResponse)) throw e;
         failures.push(e.message);
@@ -93,6 +124,7 @@ export class ExtractObligationsUseCase {
       await this.documents.update(documentId, { status: 'FAILED', error: failures[0] });
       return counts;
     }
+    counts.discarded += invalid.length;
 
     const documentDate =
       results
@@ -146,20 +178,27 @@ export class ExtractObligationsUseCase {
       counts.proposed++;
     }
 
-    const error = failures.length > 0 ? `trozos inválidos ${failures.length}/${chunks.length}: ${failures[0]}` : null;
-    await this.documents.update(documentId, { status: 'PROCESSED', error });
+    const warnings = [
+      failures.length > 0 ? `trozos inválidos ${failures.length}/${chunks.length}: ${failures[0]}` : null,
+      invalid.length > 0 ? `obligaciones inválidas ${invalid.length}: ${invalid[0]}` : null,
+    ].filter((w) => w !== null);
+    await this.documents.update(documentId, { status: 'PROCESSED', error: warnings.length > 0 ? warnings.join(' · ') : null });
     return counts;
   }
 
-  /** Un reintento con el error a la vista; si vuelve a fallar, el documento queda FAILED. */
-  private async ask(chunk: string): Promise<ExtractionResult> {
+  /**
+   * Un reintento con el error a la vista. Si la segunda respuesta tiene la forma correcta,
+   * se usan sus obligaciones válidas y se apartan las demás; si ni la forma está bien, el
+   * trozo falla (y si fallan todos, el documento queda FAILED).
+   */
+  private async ask(chunk: string): Promise<Parsed> {
     const system = systemPrompt(this.clock.today());
     const user = `Texto del documento:\n"""\n${chunk}\n"""`;
-    const first = parse(await this.llm.completeJson({ system, user }));
-    if (first.ok) return first.value;
+    const first = parse(await this.llm.completeJson({ system, user }), 'strict');
+    if (first.ok) return first;
     const retryUser = `${user}\n\nTu respuesta anterior fue inválida (${first.error}). Respondé sólo el JSON corregido.`;
-    const second = parse(await this.llm.completeJson({ system, user: retryUser }));
-    if (second.ok) return second.value;
+    const second = parse(await this.llm.completeJson({ system, user: retryUser }), 'lenient');
+    if (second.ok) return second;
     throw new InvalidLlmResponse(`respuesta del LLM inválida: ${second.error}`);
   }
 }

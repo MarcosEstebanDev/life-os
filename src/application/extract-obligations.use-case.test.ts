@@ -102,6 +102,19 @@ test('dos respuestas inválidas dejan el documento FAILED', async () => {
   assert.match(d.error ?? '', /^respuesta del LLM inválida/);
 });
 
+test('una obligación inválida tras el reintento se descarta sola: las demás entran y el documento avisa', async () => {
+  // Caso real: en una planilla con "bimestral" el modelo insistió con BIMONTHLY y se perdía todo el documento.
+  const bimestral = visa({ recurrence: 'BIMONTHLY' });
+  const { useCase, obligations, docs, llm, doc } = await setup([answer([payment(), bimestral]), answer([payment(), bimestral])]);
+  const result = await useCase.execute(doc.id);
+  assert.equal(llm.calls.length, 2);
+  assert.deepEqual(result, { proposed: 1, attached: 0, discarded: 1 });
+  assert.equal((await obligations.list('u1'))[0].title, 'Pagar tarjeta');
+  const d = await docs.get(doc.id);
+  assert.equal(d.status, 'PROCESSED');
+  assert.match(d.error ?? '', /^obligaciones inválidas 1: .*recurrence/);
+});
+
 test('un plazo relativo se cuenta desde la fecha del documento', async () => {
   const { useCase, obligations, doc } = await setup([answer([visa()])]);
   await useCase.execute(doc.id);
