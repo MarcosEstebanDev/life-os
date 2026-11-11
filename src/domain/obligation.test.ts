@@ -52,6 +52,11 @@ test('completar una mensual genera la siguiente ya activa, clampeada a fin de me
   assert.equal(next.doneAt, null);
 });
 
+test('completar una trimestral suma tres meses, clampeada a fin de mes', () => {
+  const { next } = complete(obligation({ status: 'ACTIVE', recurrence: 'QUARTERLY', dueDate: '2026-11-30' }), '2026-11-30T12:00:00Z', 'o2');
+  assert.equal(next?.dueDate, '2027-02-28');
+});
+
 test('completar una anual suma un año', () => {
   const { next } = complete(obligation({ status: 'ACTIVE', recurrence: 'YEARLY' }), '2026-10-30T12:00:00Z', 'o2');
   assert.equal(next?.dueDate, '2027-10-31');

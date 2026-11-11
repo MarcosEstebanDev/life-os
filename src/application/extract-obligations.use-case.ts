@@ -26,7 +26,7 @@ Respondé SOLO un objeto JSON con esta forma:
     "title": "<qué hay que hacer, corto>",
     "kind": "PAYMENT" | "RENEWAL" | "DEADLINE" | "EXPIRY" | "OTHER",
     "due": { "type": "absolute", "date": "YYYY-MM-DD" } | { "type": "relative", "months": <entero>, "days": <entero> } | { "type": "unknown" },
-    "recurrence": "NONE" | "MONTHLY" | "YEARLY",
+    "recurrence": "NONE" | "MONTHLY" | "QUARTERLY" | "YEARLY",
     "amount": <número con punto decimal, sin separador de miles> | null,
     "currency": "<código ISO 4217, ej. ARS, USD, NZD>" | null,
     "counterparty": "<empresa u organismo>" | null,
@@ -38,6 +38,7 @@ Reglas:
 - documentDate es la fecha de emisión o firma del documento, no la de hoy.
 - Si el plazo es relativo a la emisión ("12 meses desde la emisión"), usá "relative"; no lo calcules vos.
 - Un débito "el día 5 de cada mes" es recurrence "MONTHLY" con due { "type": "unknown" }, no un plazo relativo.
+- "Trimestral" o "cada 3 meses" es "QUARTERLY". Otra frecuencia que no esté en la lista (bimestral, semestral) va como "NONE".
 - En un resumen de tarjeta, la obligación es pagar el total en la fecha de VENCIMIENTO (no la de cierre ni la de próximo cierre).
 - Con fecha absoluta, la evidencia tiene que incluir esa fecha escrita tal cual. Si la fecha y el monto están en líneas distintas, citá las dos líneas completas, una detrás de la otra.
 - Si no hay fecha clara, usá { "type": "unknown" }. No inventes fechas ni montos.

@@ -25,6 +25,11 @@ test('acepta una extracción válida', () => {
   assert.equal(extractionResultSchema.safeParse(valid).success, true);
 });
 
+test('acepta la recurrencia trimestral y rechaza la bimestral', () => {
+  assert.equal(extractionResultSchema.safeParse(withObligation({ recurrence: 'QUARTERLY' })).success, true);
+  assert.equal(extractionResultSchema.safeParse(withObligation({ recurrence: 'BIMONTHLY' })).success, false);
+});
+
 test('rechaza montos en formato local en vez de número', () => {
   assert.equal(extractionResultSchema.safeParse(withObligation({ amount: '1.234,56' })).success, false);
 });
