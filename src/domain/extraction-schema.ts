@@ -17,22 +17,33 @@ const dueSchema = z.discriminatedUnion('type', [
  * "$ 1.234,56" o un "15/03/2027" no pasan, y disparan el reintento en vez
  * de entrar como dato corrupto.
  */
+export const extractedObligationSchema = z.object({
+  title: z.string().min(3),
+  kind: z.enum(['PAYMENT', 'RENEWAL', 'DEADLINE', 'EXPIRY', 'OTHER']),
+  due: dueSchema,
+  recurrence: z.enum(['NONE', 'MONTHLY', 'YEARLY']),
+  // Decimal(12,2): un CBU o un número de póliza tomado como monto no entra.
+  amount: z.number().nonnegative().lt(1e10).nullable(),
+  currency: z.string().regex(/^[A-Z]{3}$/, 'código ISO 4217').nullable(),
+  counterparty: z.string().nullable(),
+  evidence: z.string().min(8),
+  confidence: z.number().min(0).max(1),
+});
+
+const documentDateSchema = z.object({ date: isoDate, evidence: z.string() }).nullable();
+
 export const extractionResultSchema = z.object({
-  documentDate: z.object({ date: isoDate, evidence: z.string() }).nullable(),
-  obligations: z.array(
-    z.object({
-      title: z.string().min(3),
-      kind: z.enum(['PAYMENT', 'RENEWAL', 'DEADLINE', 'EXPIRY', 'OTHER']),
-      due: dueSchema,
-      recurrence: z.enum(['NONE', 'MONTHLY', 'YEARLY']),
-      // Decimal(12,2): un CBU o un número de póliza tomado como monto no entra.
-      amount: z.number().nonnegative().lt(1e10).nullable(),
-      currency: z.string().regex(/^[A-Z]{3}$/, 'código ISO 4217').nullable(),
-      counterparty: z.string().nullable(),
-      evidence: z.string().min(8),
-      confidence: z.number().min(0).max(1),
-    }),
-  ),
+  documentDate: documentDateSchema,
+  obligations: z.array(extractedObligationSchema),
+});
+
+/**
+ * Sólo la forma de afuera: cada obligación se valida aparte, para que una sola
+ * inválida (tras el reintento) se descarte sin llevarse a las demás.
+ */
+export const extractionEnvelopeSchema = z.object({
+  documentDate: documentDateSchema,
+  obligations: z.array(z.unknown()),
 });
 
 export type ExtractionResult = z.infer<typeof extractionResultSchema>;

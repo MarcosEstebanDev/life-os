@@ -15,7 +15,7 @@ memoria o en una planilla. El primer usuario soy yo, todos los días.
 ## Cómo funciona
 
 ```
-carpeta observada ─▶ texto (pdf-parse) ─▶ LLM local propone obligaciones con evidencia
+carpeta observada ─▶ texto (pdf, txt, md, csv, xlsx) ─▶ LLM local propone obligaciones con evidencia
       ─▶ yo reviso y acepto ─▶ brief: atrasadas · próximos 7 días · próximos 30 días
 ```
 

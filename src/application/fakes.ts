@@ -118,7 +118,7 @@ export class RecordingQueue implements JobQueue {
 export class FakeTextExtractor implements TextExtractor {
   constructor(private readonly result: string | Error) {}
   supports(ext: string) {
-    return ['.pdf', '.txt', '.md'].includes(ext);
+    return ['.pdf', '.txt', '.md', '.csv', '.xlsx'].includes(ext);
   }
   async extract() {
     if (this.result instanceof Error) throw this.result;
