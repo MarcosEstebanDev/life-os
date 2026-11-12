@@ -64,7 +64,7 @@ test('unir fragmentos no deja pasar uno inventado ni pedacitos sueltos', () => {
 });
 
 test('un plazo relativo tiene que estar escrito en la evidencia', () => {
-  assert.equal(relativeAppears({ months: 12, days: 0 }, 'must be used within 12 months of issue'), true);
+  assert.equal(relativeAppears({ months: 12, days: 0 }, 'the permit must be used within 12 months of issue'), true);
   assert.equal(relativeAppears({ months: 12, days: 0 }, 'tiene una vigencia de 1 año desde la firma'), true);
   assert.equal(relativeAppears({ months: 0, days: 30 }, 'dentro de los 30 días corridos'), true);
   assert.equal(relativeAppears({ months: 2, days: 0 }, 'renovar dentro de los dos meses'), true);

@@ -18,7 +18,7 @@
 - BullMQ: pasar `new Redis(url, { maxRetriesPerRequest: null })` ya construida; cerrar con `quit()` a mano.
 - Puertos de Docker: Postgres `5434`, Redis `6381` (no chocar con agent-platform 5433/6380).
 - LLM: default `LLM_BASE_URL=http://localhost:11434/v1`, `LLM_MODEL=qwen2.5:7b-instruct`. Si el host de `LLM_BASE_URL` no es `localhost`/`127.0.0.1`/`::1` y `LLM_ALLOW_REMOTE` no es `true`, la config lanza error al arrancar.
-- Fechas de obligación: sólo fecha (`YYYY-MM-DD`, columna `@db.Date`), "hoy" en `TZ=America/Sao_Paulo` vía el puerto `Clock`.
+- Fechas de obligación: sólo fecha (`YYYY-MM-DD`, columna `@db.Date`), "hoy" en la zona de `TIME_ZONE` vía el puerto `Clock`.
 - Tolerancia de duplicados: ±3 días. Ventanas del brief: 7 y 30 días.
 - Extensiones aceptadas: `.pdf`, `.txt`, `.md`. Sin OCR: PDF sin texto → `FAILED` con motivo exacto `sin texto (requiere OCR)`.
 - Tests unitarios sin base, sin Docker y sin LLM (dobles en `src/application/fakes.ts`).
@@ -158,7 +158,7 @@
 - Test: `src/config.test.ts`, `src/infrastructure/text/file-text-extractor.test.ts` (+ fixture `test/fixtures/sample.pdf` con texto)
 
 **Interfaces:**
-- Produces: `loadConfig(env: NodeJS.ProcessEnv): Config` con `{ databaseUrl, redisUrl, watchDir, llm: { baseUrl, apiKey, model, allowRemote }, port }` (lanza `ConfigError` con mensaje que nombra `LLM_ALLOW_REMOTE`); `OpenAiCompatibleAdapter implements LlmPort` (POST `/chat/completions` con `response_format: { type: 'json_object' }`, `temperature: 0`, timeout 300 s por ser CPU); `FileTextExtractor implements TextExtractor` (pdf-parse para `.pdf`, `fs.readFile` utf-8 para `.txt/.md`); `SystemClock` con `Intl` en `America/Sao_Paulo`.
+- Produces: `loadConfig(env: NodeJS.ProcessEnv): Config` con `{ databaseUrl, redisUrl, watchDir, llm: { baseUrl, apiKey, model, allowRemote }, port }` (lanza `ConfigError` con mensaje que nombra `LLM_ALLOW_REMOTE`); `OpenAiCompatibleAdapter implements LlmPort` (POST `/chat/completions` con `response_format: { type: 'json_object' }`, `temperature: 0`, timeout 300 s por ser CPU); `FileTextExtractor implements TextExtractor` (pdf-parse para `.pdf`, `fs.readFile` utf-8 para `.txt/.md`); `SystemClock` con `Intl` en la zona de `TIME_ZONE`.
   Script `npm run llm:smoke` manda un texto de ejemplo e imprime el JSON.
 
 - [ ] **Step 1: Tests que fallan** — `https://api.groq.com/openai/v1` sin `LLM_ALLOW_REMOTE` → lanza; con `LLM_ALLOW_REMOTE=true` → ok; `http://127.0.0.1:11434/v1` → ok; extractor lee el texto del PDF fixture.

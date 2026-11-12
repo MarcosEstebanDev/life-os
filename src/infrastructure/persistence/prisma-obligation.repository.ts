@@ -4,7 +4,7 @@ import type { ObligationRepository } from '../../domain/ports/obligation-reposit
 
 /**
  * `@db.Date` vuelve como medianoche UTC: se corta a YYYY-MM-DD sin pasar por
- * la zona local, que en la zona local lo movería al día anterior.
+ * la zona local, que en una zona UTC-3 lo movería al día anterior.
  */
 function toDomain(row: Row): Obligation {
   return {

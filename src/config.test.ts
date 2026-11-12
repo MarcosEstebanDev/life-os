@@ -64,11 +64,20 @@ test('defaults de puerto y LLM', () => {
 });
 
 test('timeout del LLM: alcanza para cargar el modelo en frío desde un disco lento', () => {
-  // Desde un disco lento cargar un 7B tarda más de 5 minutos: cortar antes aborta la carga y la cola reintenta sin fin.
+  // Desde un disco lento cargar un 7B puede tardar más de 5 minutos: cortar antes aborta la carga y la cola reintenta sin fin.
   assert.equal(loadConfig(base).llm.timeoutMs, 1_800_000);
   assert.equal(loadConfig({ ...base, LLM_TIMEOUT_MS: '60000' }).llm.timeoutMs, 60_000);
 });
 
 test('timeout del LLM inválido no arranca', () => {
   assert.throws(() => loadConfig({ ...base, LLM_TIMEOUT_MS: 'diez' }), (e: unknown) => e instanceof ConfigError && /LLM_TIMEOUT_MS/.test(e.message));
+});
+
+test('zona horaria: UTC por defecto y la de TIME_ZONE si viene', () => {
+  assert.equal(loadConfig(base).timeZone, 'UTC');
+  assert.equal(loadConfig({ ...base, TIME_ZONE: 'America/Sao_Paulo' }).timeZone, 'America/Sao_Paulo');
+});
+
+test('zona horaria inválida: no arranca', () => {
+  assert.throws(() => loadConfig({ ...base, TIME_ZONE: 'Marte/Olimpo' }), /TIME_ZONE/);
 });

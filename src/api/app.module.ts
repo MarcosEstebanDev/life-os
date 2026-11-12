@@ -89,7 +89,7 @@ function authDeps(config: Config, prisma: PrismaClient, redis: Redis): AuthDeps 
     hasher: new Argon2PasswordHasher(),
     limiter: new RedisRateLimiter(redis),
     events: new PrismaAuthEventLog(prisma),
-    clock: new SystemClock(),
+    clock: new SystemClock(config.timeZone),
     box: new AesGcmSecretBox(config.auth.encryptionKey),
     signup: config.auth.signup,
   };
@@ -122,10 +122,15 @@ const useCase = <T>(provide: symbol, build: (d: AuthDeps) => T) => ({ provide, u
     { provide: REVIEW, useFactory: (o: ObligationRepository) => new ReviewObligationUseCase(o), inject: [OBLIGATIONS] },
     {
       provide: COMPLETE,
-      useFactory: (o: ObligationRepository) => new CompleteObligationUseCase(o, new SystemClock(), randomUUID),
-      inject: [OBLIGATIONS],
+      useFactory: (o: ObligationRepository, c: Config) =>
+        new CompleteObligationUseCase(o, new SystemClock(c.timeZone), randomUUID),
+      inject: [OBLIGATIONS, CONFIG],
     },
-    { provide: BRIEF, useFactory: (o: ObligationRepository) => new GetBriefUseCase(o, new SystemClock()), inject: [OBLIGATIONS] },
+    {
+      provide: BRIEF,
+      useFactory: (o: ObligationRepository, c: Config) => new GetBriefUseCase(o, new SystemClock(c.timeZone)),
+      inject: [OBLIGATIONS, CONFIG],
+    },
     {
       provide: REPROCESS,
       useFactory: (d: DocumentRepository, o: ObligationRepository, q: BullMqJobQueue) => new ReprocessDocumentUseCase(d, o, q),

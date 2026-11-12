@@ -1,6 +1,6 @@
 # life-os — Diseño del MVP (núcleo + brief diario)
 
-**Fecha:** 2026-10-27 · **Estado:** borrador para aprobación de el usuario
+**Fecha:** 2026-10-27 · **Estado:** borrador para aprobación del usuario
 
 ## Intención
 
@@ -9,9 +9,9 @@ trámites), entiende qué me obligan a hacer y cuándo, y me lo recuerda
 cada día. La entidad central es la **Obligación**: algo que tengo que hacer o
 pagar, con fecha, y con el documento del que salió como evidencia.
 
-**Por qué ahora:** tengo papeles reales que vencen (un permiso con plazo
-tiene 12 meses para entrar desde la emisión; seguros, tarjetas). Y sirve como
-proyecto con **uso real**: el primer usuario soy yo, todos los días.
+**Por qué ahora:** hay papeles reales que vencen (permisos con plazo desde la
+emisión, seguros, tarjetas). Y sirve como proyecto con **uso real**: una
+herramienta que se usa todos los días.
 
 **Éxito:** dejo ~10 documentos reales en una carpeta y, después de revisar las
 propuestas, el brief diario me muestra correctamente qué vence y qué está

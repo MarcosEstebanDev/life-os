@@ -28,7 +28,7 @@ const llm = new OpenAiCompatibleAdapter(config.llm);
 
 const ingest = new IngestFileUseCase(documents, queue, extractor);
 const extractText = new ExtractTextUseCase(documents, queue, extractor);
-const extractObligations = new ExtractObligationsUseCase(documents, obligations, llm, new SystemClock(), randomUUID);
+const extractObligations = new ExtractObligationsUseCase(documents, obligations, llm, new SystemClock(config.timeZone), randomUUID);
 
 type Payload = { documentId: string };
 

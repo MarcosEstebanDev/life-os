@@ -1,6 +1,6 @@
 # life-os — Autenticación (diseño)
 
-**Fecha:** 2026-10-27 · **Estado:** decidido por Claude a pedido de el usuario ("armalo a criterio propio")
+**Fecha:** 2026-10-27 · **Estado:** decidido por Claude a pedido del usuario ("armalo a criterio propio")
 
 ## Intención
 
