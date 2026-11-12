@@ -31,8 +31,8 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
 }
 
 /**
- * El timeout cuenta también la carga del modelo: desde un disco lento un 7B tarda más
- * de 5 minutos en frío, y si el pedido se corta antes Ollama aborta la carga,
+ * El timeout cuenta también la carga del modelo: desde un disco lento un 7B puede
+ * tardar más de 5 minutos en frío, y si el pedido se corta antes Ollama aborta la carga,
  * así que cada reintento vuelve a empezar de cero. 30 minutos por pedido.
  */
 const DEFAULT_LLM_TIMEOUT_MS = 30 * 60_000;

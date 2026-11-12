@@ -1,98 +1,23 @@
 # life-os
 
-Lee mis papeles (contratos, seguros, resúmenes de tarjeta, trámites),
-detecta qué me obligan a hacer y cuándo, y me lo muestra en un brief diario.
+**Reads personal paperwork — contracts, insurance policies, card statements,
+bills — finds what it obliges you to do and by when, and shows it in a daily
+brief.**
 
-La pieza central es la **Obligación**: algo que tengo que hacer o pagar, con
-fecha, y con el fragmento literal del documento que lo justifica.
+The central idea is the **Obligation**: something to do or pay, with a date,
+and with the literal passage of the source document that justifies it. A
+language model proposes obligations; a human accepts them. Nothing the model
+says counts until someone has looked at it.
 
-## Por qué existe
+It is a single-user tool built to be used every day, and a backend-focused
+portfolio piece: hexagonal architecture, a local LLM behind a port, an eval
+set for the extraction, and accounts with hand-rolled TOTP two-factor auth.
 
-Porque lo uso. Tengo vencimientos reales (un permiso con plazo tiene 12
-meses para entrar desde la emisión, seguros, tarjetas) y antes vivían en mi
-memoria o en una planilla. El primer usuario soy yo, todos los días.
+---
 
-## Cómo funciona
+## Run it
 
-```
-carpeta observada ─▶ texto (pdf, txt, md, csv, xlsx) ─▶ LLM local propone obligaciones con evidencia
-      ─▶ yo reviso y acepto ─▶ brief: atrasadas · próximos 7 días · próximos 30 días
-```
-
-- **Nada cuenta sin revisión.** Lo que propone el modelo queda `PROPOSED` hasta
-  que lo acepto; para aceptarlo hace falta una fecha.
-- **Sin evidencia no hay obligación.** Si el fragmento que cita el modelo no
-  aparece en el documento (comparación normalizada), se descarta. Puede pegar
-  hasta 3 fragmentos literales (la línea del vencimiento y la del total).
-- **Plazos relativos desde la fecha del documento.** "12 meses desde la emisión"
-  se cuenta desde la emisión, no desde el día en que se procesó el PDF.
-- **Sin duplicados.** El resumen de cada mes de la misma tarjeta se reconoce
-  como la misma serie (contraparte + tipo + título, ±3 días) y suma evidencia.
-- **Recurrentes.** Marcar como hecha una mensual o anual genera la siguiente.
-- **El brief se calcula en vivo**: no depende de un cron ni de que la PC esté
-  prendida a una hora.
-
-- **Montos y fechas tienen que estar escritos en el texto.** Si el modelo lee
-  `1.234` donde dice `$ 1.234,56`, o da vuelta día y mes, el dato queda vacío
-  y lo completo al revisar. La fecha, además, tiene que estar en la evidencia
-  citada (en un resumen hay cierre, próximo cierre y vencimiento), y un plazo
-  relativo tiene que estar escrito ("12 meses", "30 días"): "el día 5 de cada
-  mes" no es "un mes y cinco días desde la emisión".
-
-## Privacidad
-
-Son datos financieros. El LLM corre **local con Ollama** por defecto. Si
-`LLM_BASE_URL` apunta fuera de esta máquina, o `LLM_MODEL` es un modelo
-`-cloud` de Ollama (corre en ollama.com aunque se pida al endpoint local), el
-sistema **no arranca** salvo que `LLM_ALLOW_REMOTE=true` esté puesto a
-propósito. La API escucha sólo en `127.0.0.1` y rechaza pedidos cuyo `Host`
-no sea `localhost`/`127.0.0.1` (DNS rebinding).
-
-## Cuentas y seguridad
-
-Cada usuario ve sólo sus documentos y obligaciones: un id ajeno responde 404,
-igual que uno que no existe.
-
-- **Sesiones opacas en Postgres, no JWT** ([ADR 0001](docs/adr/0001-sesiones-opacas.md)):
-  cookie HttpOnly + SameSite=Lax con un token aleatorio; la base guarda sólo su
-  SHA-256. Cerrar una sesión, todas, o cambiar la contraseña tiene efecto en el acto.
-  En Seguridad se ven los dispositivos con su última actividad.
-- **Verificación en dos pasos (TOTP, RFC 6238)** implementada a mano y probada
-  con los vectores del RFC. Secreto cifrado con AES-256-GCM, 10 códigos de
-  recuperación de un solo uso (sólo su hash en la base), un código no sirve dos
-  veces. La contraseña sola deja una sesión que únicamente puede completar el login.
-- **Contraseñas con argon2id**, 12 a 128 caracteres, sin reglas de composición
-  (NIST SP 800-63B).
-- **Sin enumeración de cuentas:** email inexistente y contraseña incorrecta dan el
-  mismo mensaje, y los dos verifican un hash argon2.
-- **Límite de intentos en Redis, atómico:** el intento se reserva antes de verificar
-  (INCR + EXPIRE NX en un MULTI), así una ráfaga en paralelo no prueba más que el
-  límite. 5 por email y 20 por IP en 15 minutos → 429 con `Retry-After`.
-- **El 2FA no se adivina:** 10 códigos por usuario cada 15 minutos, que no se
-  reinician al volver a poner la contraseña; 5 por sesión pendiente la cierran; la
-  sesión pendiente vence a los 10 minutos. El mismo código en dos pedidos
-  simultáneos sirve una sola vez (UPDATE condicional en Postgres).
-- **CSRF:** todo método que modifica exige un `Origin` de `WEB_ORIGINS`, y sin
-  `Origin` se rechaza: en localhost SameSite=Lax no separa puertos. La web llega a
-  la API por el mismo origen (rewrite de Next) y las dos escuchan sólo en
-  127.0.0.1. Con curl hay que mandar `-H Origin:http://localhost:3011`.
-- **Redirecciones:** `?next=` se resuelve como URL y sólo se sigue si es del mismo
-  origen (`/%09/evil.com` no sale del sitio).
-- **Registro de actividad** visible para el usuario: entradas, fallos, 2FA,
-  sesiones cerradas, cambios de contraseña.
-
-Variables: `AUTH_ENCRYPTION_KEY` (32 bytes en base64), `WATCH_OWNER_EMAIL` (a
-quién pertenece lo que entra por la carpeta; el worker lo fija al arrancar, así
-que se crea la cuenta primero), `ALLOW_SIGNUP` (`first` por defecto: sólo la
-primera cuenta; `true` abierto, `false` cerrado), `WEB_ORIGINS`.
-
-Siguiente: login con Google (OIDC + PKCE), que también abre la puerta a Gmail y
-Calendar. Diseño en `docs/superpowers/specs/2026-10-27-auth-design.md`.
-
-## Levantarlo
-
-Requisitos: Node 24, Docker Desktop (abrirlo a mano: no arranca solo) y
-[Ollama](https://ollama.com) con el modelo:
+Requirements: Node 24, Docker, and [Ollama](https://ollama.com) with a model:
 
 ```bash
 ollama pull qwen2.5:7b-instruct
@@ -102,92 +27,241 @@ ollama pull qwen2.5:7b-instruct
 cp .env.example .env          # WATCH_DIR, AUTH_ENCRYPTION_KEY, WATCH_OWNER_EMAIL
 npm install && npm run web:install
 npm run db:up && npm run db:deploy
-npm run dev                   # worker + API + web juntos (o por separado:)
-npm run worker                # terminal 1: carpeta observada + extracción
-npm run api                   # terminal 2: http://127.0.0.1:3010/api
-npm run web                   # terminal 3: http://localhost:3011
+npm run dev                   # worker + API + web together, or separately:
+npm run worker                #   watched folder + extraction
+npm run api                   #   http://127.0.0.1:3010/api
+npm run web                   #   http://localhost:3011
 ```
 
-Entrá a http://localhost:3011, creá tu cuenta (la primera; después el registro se
-cierra solo), activá la verificación en dos pasos desde Seguridad, poné ese email
-en `WATCH_OWNER_EMAIL` y reiniciá `npm run dev`: el worker recién ahí empieza a
-mirar la carpeta.
+Open http://localhost:3011 and create the first account (sign-up closes by
+itself after that), enable two-step verification under Security, put that
+email in `WATCH_OWNER_EMAIL` and restart `npm run dev`: only then does the
+worker start watching the folder. Drop a PDF in `WATCH_DIR` and review it at
+`/review`.
 
-`npm run llm:smoke` prueba el modelo contra un texto de ejemplo sin base ni cola.
+`npm run llm:smoke` checks the model against a sample text, without database
+or queue.
 
-En CPU un modelo de 7B tarda entre 20 s y 2 min por documento de una página, y
-**cargarlo en frío desde un disco lento tarda unos 6 minutos**. Por eso el timeout por
-pedido es de 30 minutos (`LLM_TIMEOUT_MS`): si se corta antes, Ollama aborta la
-carga y cada reintento empieza de cero. Es un proceso en segundo plano: se deja
-el PDF en la carpeta y se revisa después.
+---
 
-Si Ollama elige una GPU por Vulkan y la carga se cuelga ("timed out
-waiting for llama-server to start"). La salida es una variante que corre en CPU,
-que comparte el archivo del modelo (no ocupa disco extra):
+## The system
 
-```bash
-printf 'FROM qwen2.5:7b-instruct\nPARAMETER num_gpu 0\n' > Modelfile.cpu
-ollama create qwen2.5:7b-instruct-cpu -f Modelfile.cpu
-# y en .env: LLM_MODEL=qwen2.5:7b-instruct-cpu
+```mermaid
+flowchart LR
+  folder[(Watched folder)] -->|file event| queue[[BullMQ]]
+  queue --> worker
+  subgraph worker [Worker process]
+    extract[Text extractor<br/>pdf · txt · md · csv · xlsx] --> llm[LLM port<br/>local Ollama]
+    llm --> evidence{Evidence<br/>found in text?}
+    evidence -- no --> drop[Discarded]
+    evidence -- yes --> dedupe[Series key<br/>dedupe]
+  end
+  dedupe --> db[(Postgres<br/>PROPOSED)]
+  db --> api[API · NestJS]
+  api --> web[Web · Next.js]
+  web -->|accept / fix / merge / discard| api
+  api --> brief[Brief: overdue ·<br/>next 7 days · next 30 days]
 ```
 
-`WATCH_DIR` puede estar en una carpeta de prueba dentro del repo (`.local/inbox`,
-ignorada por git).
+The API and the worker are **separate processes**. The API never talks to the
+model: extraction is slow (a 7B model on CPU takes from seconds to minutes per
+page), so it runs in the background and the brief only ever reads what is
+already in the database.
 
-## Pantallas
+---
 
-| Ruta | Para qué |
+## Decisions worth reading
+
+### Nothing counts without human review
+
+Everything the model proposes is stored as `PROPOSED` and stays out of the
+brief until a person accepts it, and accepting requires a date. The model is
+treated as a fast, unreliable clerk: useful for finding candidates, never the
+source of truth.
+
+### No evidence, no obligation
+
+The model must quote the passage that justifies each obligation (up to three
+literal fragments — the due-date line and the total, for example). If a quote
+is not found in the document, after normalising whitespace and punctuation,
+the proposal is discarded. Amounts and dates must be written in the text: if
+the model computes a total or swaps day and month, the field is left empty and
+completed during review. A date must also appear inside the cited evidence,
+because a statement contains several (closing date, next closing, due date).
+
+### Relative deadlines count from the document's date
+
+"12 months from issue" is counted from the issue date written in the
+document, not from the day the PDF was processed. And a relative deadline has
+to be written as one — "on the 5th of each month" is a recurrence, not "one
+month and five days from issue".
+
+### One series, not one duplicate per month
+
+Each month's statement for the same card is recognised as the same series
+(counterparty + kind + title, ±3 days) and adds evidence instead of creating a
+new obligation. Completing a monthly, quarterly or yearly obligation creates
+the next one.
+
+### The brief is computed live
+
+No cron job and no "run at 8 am": the brief is a query over accepted
+obligations at request time. It does not depend on the machine being on at a
+given hour.
+
+### The model is local by default, and remote is opt-in
+
+This is financial data. The LLM runs locally through Ollama behind an
+OpenAI-compatible port. If `LLM_BASE_URL` points outside the machine, or the
+model is an Ollama `-cloud` model (which runs remotely even when requested
+from the local endpoint), the system **refuses to start** unless
+`LLM_ALLOW_REMOTE=true` is set on purpose. The API listens only on
+`127.0.0.1` and rejects requests whose `Host` is not `localhost`/`127.0.0.1`
+(DNS rebinding).
+
+### Opaque sessions in Postgres, not JWT — [ADR 0001](docs/adr/0001-sesiones-opacas.md)
+
+A sibling project uses short-lived JWTs with rotating refresh tokens, which is
+right for a horizontally scaled multi-tenant API. Here the forces are
+different: one backend, immediate revocation, a visible list of devices, and
+an intermediate "password passed, code pending" state. So the cookie carries
+32 random bytes, and the database stores only their SHA-256. Signing out of
+one device, all of them, or changing the password takes effect at once.
+
+### Two-step verification, implemented by hand
+
+TOTP (RFC 6238) written from scratch and tested against the RFC's own test
+vectors. The secret is encrypted with AES-256-GCM, there are 10 single-use
+recovery codes (only their hashes are stored), and a code cannot be used twice
+— the same code in two concurrent requests succeeds once, enforced with a
+conditional `UPDATE`. A password alone yields a session that can only finish
+the login.
+
+### Attempt limits that a burst cannot outrun
+
+Limits live in Redis and the attempt is **reserved before** it is verified
+(`INCR` + `EXPIRE NX` in a `MULTI`), so a parallel burst cannot try more than
+the limit: 5 per email and 20 per IP every 15 minutes, then `429` with
+`Retry-After`. Second-factor codes have their own budget that does not reset
+by re-entering the password. Unknown email and wrong password produce the same
+message and both verify an argon2 hash, so accounts cannot be enumerated.
+
+### Every user sees only their own data
+
+Documents and obligations are scoped by owner, and someone else's id answers
+`404`, exactly like an id that does not exist. Mutating requests must carry an
+`Origin` from `WEB_ORIGINS` (on localhost, `SameSite=Lax` does not separate
+ports), and `?next=` redirects are only followed within the same origin.
+
+---
+
+## Layout
+
+```
+src/
+├─ domain/            # pure: Obligation, brief, evidence matching, date resolution,
+│  │                  # series keys, extraction schema; auth rules (TOTP, sessions)
+│  └─ ports/          # LLM, text extractor, repositories, queue, clock, secret box
+├─ application/       # use cases: ingest, extract, review, complete, brief, auth
+├─ infrastructure/    # adapters: OpenAI-compatible LLM, file text extractor,
+│                     # Prisma repositories, BullMQ, folder watcher, crypto
+├─ api/               # NestJS controllers, host guard, error filter
+├─ worker/            # the background process: watcher + extraction pipeline
+└─ eval/              # extraction eval runner and scoring
+apps/web/             # Next.js app (reaches the API through a same-origin rewrite)
+eval/                 # eval cases and their expected obligations
+docs/adr/             # architecture decisions
+docs/superpowers/     # design specs and implementation plans
+```
+
+The dependency rule is the usual one: `domain` imports nothing, `application`
+depends only on `domain` and its ports, and `infrastructure` implements them.
+
+### Screens
+
+| Route | Purpose |
 |---|---|
-| `/brief` | Lo atrasado, lo de los próximos 7 y 30 días, y cuántas propuestas esperan revisión |
-| `/review` | Cada propuesta con su evidencia resaltada y el documento; corregir, aceptar, fusionar o descartar |
-| `/obligations` | Todas, filtradas por estado y tipo; marcar como hecha |
-| `/documents` | Qué entró, en qué estado está, por qué falló; reprocesar |
-| `/settings/security` | Verificación en dos pasos, dispositivos con sesión abierta, contraseña, actividad |
-| `/login`, `/register` | Acceso; con 2FA, `/login/mfa` pide el código o uno de recuperación |
+| `/brief` | Overdue, next 7 and 30 days, and how many proposals await review |
+| `/review` | Each proposal with its highlighted evidence and the document; fix, accept, merge or discard |
+| `/obligations` | All of them, filtered by status and kind; mark as done |
+| `/documents` | What came in, its state, why it failed; reprocess |
+| `/settings/security` | Two-step verification, devices with an open session, password, activity log |
+| `/login`, `/register` | Access; with 2FA, `/login/mfa` asks for the code or a recovery code |
 
-## Desarrollo
+---
+
+## Tests and evals
 
 ```bash
-npm test          # dominio y casos de uso: sin base, sin Docker, sin LLM
+npm test                 # domain and use cases: no database, no Docker, no LLM
 npm run typecheck
-npm run db:smoke  # ida y vuelta contra Postgres real, incluido el aislamiento entre usuarios
+npm run db:smoke         # round trip against real Postgres, including isolation between users
 npm run web:build
+npm run eval:extraction -- <label> [case ...]
 ```
 
-Arquitectura hexagonal, igual que agent-platform: `src/domain` es puro,
-`src/application` son los casos de uso contra puertos, `src/infrastructure`
-los adaptadores. API (NestJS) y worker (BullMQ) son procesos separados; la API
-no conoce el LLM.
+The unit suite (~180 tests) runs in seconds with no infrastructure: the
+domain is pure and the use cases run against in-memory fakes of the ports.
 
-Diseño y planes en `docs/superpowers/specs` y `docs/superpowers/plans`;
-decisiones de arquitectura en `docs/adr`.
+**The extraction has its own eval.** `eval/cases` holds sample documents and
+`eval/expected.json` the obligations a careful reader would extract from each.
+`eval:extraction` runs the configured model over them and scores every
+expected item on kind, due date, recurrence and amount, and counts extra
+proposals that should not exist. Prompt or model changes are judged by that
+score, not by eyeballing one document.
 
-## Estado
+An end-to-end check with synthetic PDFs (a utility bill, a card statement, a
+medical appointment, an insurance policy and an already-paid receipt) found
+four real bugs — a watched folder hidden by `.gitignore` rules, a timeout that
+aborted the model while it was still loading, a date taken from the wrong line,
+and "day 5 of every month" read as a relative deadline. Each one now has a
+test.
 
-MVP del núcleo + brief y cuentas con 2FA, verificado con tests (unitarios y
-contra Postgres), con curl contra la API y recorriendo la web.
+---
 
-**Prueba de punta a punta con Ollama (2026-11-07)**, 5 PDFs sintéticos con texto
-(factura de luz, resumen de VISA con una cuota, turno médico, póliza de auto y un
-recibo de alquiler ya pagado), `qwen2.5:7b-instruct` en CPU:
+## What this deliberately does not have
 
-| Documento | Propuesto | Resultado |
-|---|---|---|
-| Factura de luz | Pagar 18/11 · $ 48.731,20 · y el 2.º vencimiento con recargo | correcto; el 2.º se descarta al revisar |
-| Resumen VISA | Pagar 10/11, sin monto | fecha bien; el monto lo calculó (total − mínimo) y quedó vacío: se completa al revisar |
-| Turno médico | Asistir 19/11 | correcto (sin contraparte) |
-| Póliza | Renovar 01/12/2026 · premio mensual $ 38.900 sin fecha | correcto; la fecha del débito se completa al revisar |
-| Recibo pagado | nada | correcto |
+- **OCR.** Most paperwork arrives as PDFs with a text layer. Scans would go
+  behind the existing `TextExtractor` port.
+- **Gmail, Google Drive and Calendar.** Designed (login with Google via OIDC +
+  PKCE opens the door to them) but not built.
+- **Notion sync.** Planned as bidirectional, with per-field conflict resolution
+  by `last_edited_time`.
+- **User-defined structure and rules.** Categories and fields are fixed for
+  now.
 
-La primera pasada encontró cuatro problemas (carpeta bajo `.local` ignorada,
-timeout que abortaba la carga del modelo, fecha de otra línea tomada como
-vencimiento, "día 5 de cada mes" leído como plazo relativo) y un turno que no
-salía; todo tiene test y quedó arreglado. Falta probar con papeles
-reales.
+---
 
-## Lo que viene
+## Developing notes
 
-1. OCR para escaneos (detrás del puerto `TextExtractor`).
-2. Gmail y Google Calendar en el brief.
-3. Notion bidireccional.
-4. Estructura y reglas configurables.
+- On CPU, a 7B model takes from 20 seconds to a couple of minutes per page,
+  and loading it cold from a slow disk can take several minutes. That is why
+  the per-request timeout is 30 minutes (`LLM_TIMEOUT_MS`): cutting it earlier
+  makes Ollama abort the load and every retry starts from zero.
+- If Ollama picks a GPU that hangs while loading ("timed out waiting for
+  llama-server to start"), a CPU-only variant shares the same model file:
+
+  ```bash
+  printf 'FROM qwen2.5:7b-instruct\nPARAMETER num_gpu 0\n' > Modelfile.cpu
+  ollama create qwen2.5:7b-instruct-cpu -f Modelfile.cpu
+  # then in .env: LLM_MODEL=qwen2.5:7b-instruct-cpu
+  ```
+
+- `WATCH_DIR` can point to a test folder inside the repo (`.local/inbox`,
+  ignored by git).
+- Environment: `AUTH_ENCRYPTION_KEY` (32 bytes, base64), `WATCH_OWNER_EMAIL`
+  (who owns what arrives through the folder), `ALLOW_SIGNUP` (`first` by
+  default: only the first account; `true` open, `false` closed), `WEB_ORIGINS`.
+
+---
+
+## Stack
+
+TypeScript · NestJS 11 · Prisma 7 · PostgreSQL · BullMQ + Redis · Next.js ·
+Ollama (any OpenAI-compatible endpoint) · node:test.
+
+## Further reading
+
+- `docs/adr/` — architecture decisions (in Spanish).
+- `docs/superpowers/specs/` and `docs/superpowers/plans/` — design documents
+  and implementation plans for the MVP and for authentication.
