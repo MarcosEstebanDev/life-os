@@ -18,6 +18,8 @@ export interface Config {
   };
   /** Dueño de lo que entra por la carpeta observada. Sólo el worker lo exige. */
   watchOwnerEmail: string | null;
+  /** Zona IANA que define "hoy" para los vencimientos (`TIME_ZONE`, UTC por defecto). */
+  timeZone: string;
 }
 
 export class ConfigError extends Error {}
@@ -76,5 +78,17 @@ export function loadConfig(env: NodeJS.ProcessEnv): Config {
       signup: env.ALLOW_SIGNUP === 'true' ? 'open' : env.ALLOW_SIGNUP === 'false' ? 'closed' : 'first',
     },
     watchOwnerEmail: env.WATCH_OWNER_EMAIL ? env.WATCH_OWNER_EMAIL.trim().toLowerCase() : null,
+    timeZone: timeZone(env.TIME_ZONE),
   };
+}
+
+/** Una zona mal escrita haría que "hoy" fuera otro día: mejor no arrancar. */
+function timeZone(value: string | undefined): string {
+  const zone = value?.trim() || 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: zone });
+  } catch {
+    throw new ConfigError(`TIME_ZONE=${zone} no es una zona horaria IANA válida (p. ej. America/Sao_Paulo).`);
+  }
+  return zone;
 }

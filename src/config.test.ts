@@ -72,3 +72,12 @@ test('timeout del LLM: alcanza para cargar el modelo en frío desde un disco len
 test('timeout del LLM inválido no arranca', () => {
   assert.throws(() => loadConfig({ ...base, LLM_TIMEOUT_MS: 'diez' }), (e: unknown) => e instanceof ConfigError && /LLM_TIMEOUT_MS/.test(e.message));
 });
+
+test('zona horaria: UTC por defecto y la de TIME_ZONE si viene', () => {
+  assert.equal(loadConfig(base).timeZone, 'UTC');
+  assert.equal(loadConfig({ ...base, TIME_ZONE: 'America/Sao_Paulo' }).timeZone, 'America/Sao_Paulo');
+});
+
+test('zona horaria inválida: no arranca', () => {
+  assert.throws(() => loadConfig({ ...base, TIME_ZONE: 'Marte/Olimpo' }), /TIME_ZONE/);
+});

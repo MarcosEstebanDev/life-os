@@ -251,7 +251,8 @@ test.
   ignored by git).
 - Environment: `AUTH_ENCRYPTION_KEY` (32 bytes, base64), `WATCH_OWNER_EMAIL`
   (who owns what arrives through the folder), `ALLOW_SIGNUP` (`first` by
-  default: only the first account; `true` open, `false` closed), `WEB_ORIGINS`.
+  default: only the first account; `true` open, `false` closed), `WEB_ORIGINS`,
+  `TIME_ZONE` (IANA zone that defines "today" for due dates; `UTC` by default).
 
 ---
 
